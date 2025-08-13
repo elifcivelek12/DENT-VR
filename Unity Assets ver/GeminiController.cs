@@ -68,9 +68,6 @@ JSON dýþýnda metin yazma.";
             return;
         }
 
-        // --- DÜZELTME ---
-        // Gelen metin zaten düz bir cümle. Onu tekrar JSON'a çevirmeye gerek yok.
-        // Doðrudan Coroutine'e gönderiyoruz.
         StartCoroutine(ClassifyAndRespond(gelenMetin));
     }
 
@@ -91,7 +88,7 @@ JSON dýþýnda metin yazma.";
 
             yield return request.SendWebRequest();
 
-            CocukTepki sonuc = null; // Deðiþkeni döngünün dýþýnda null olarak tanýmla
+            CocukTepki sonuc = null; 
 
             if (request.result != UnityWebRequest.Result.Success)
             {
@@ -103,22 +100,20 @@ JSON dýþýnda metin yazma.";
                 string hamCikti = request.downloadHandler.text;
                 try
                 {
-                    // --- DÜZELTME: Mantýk akýþý temizlendi ---
 
-                    // 1. API'nin genel yanýtýný ayrýþtýr
                     GeminiApiResponse apiResponse = JsonConvert.DeserializeObject<GeminiApiResponse>(hamCikti);
                     string modelinUrettigiText = apiResponse.Candidates[0].Content.Parts[0].Text;
 
-                    // 2. Modelin ürettiði metin içindeki potansiyel markdown'ý temizle
+
                     Match match = Regex.Match(modelinUrettigiText, @"\{.*\}", RegexOptions.Singleline);
 
                     string temizlenmisJson = modelinUrettigiText; // Varsayýlan deðer
                     if (match.Success)
                     {
-                        temizlenmisJson = match.Value; // Eþleþme varsa onu kullan
+                        temizlenmisJson = match.Value; 
                     }
 
-                    // 3. Temizlenmiþ JSON'ý ayrýþtýr ve DIÞARIDAKÝ 'sonuc' deðiþkenine ata
+                    
                     sonuc = JsonConvert.DeserializeObject<CocukTepki>(temizlenmisJson);
                 }
                 catch (System.Exception e)

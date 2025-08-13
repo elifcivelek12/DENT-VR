@@ -214,79 +214,23 @@ public class ElevenLabsVoiceDemo : MonoBehaviour
             }
         }
     }
-    /*
-    IEnumerator GenerateResponseWithAI(string userPrompt)
+    
+     public void GelenMetniSeseCevir(string cevap)
     {
-        Debug.Log("🧠 Yapay zeka yanıtı oluşturuluyor...");
+        Debug.Log($"ELEVENLABS BİLDİRİYOR: Gemini 1.5'den alınan metin: '{cevap}'");
 
-        string apiUrl = 
-
-        GeminiRequest requestData = new GeminiRequest
-        {
-            contents = new Content[]
-            {
-                new Content
-                {
-                    role = "user",
-                    parts = new Part[]
-                    {
-                        new Part { text = userPrompt }
-                    }
-                }
-            }
-        };
-
-        string jsonData = JsonUtility.ToJson(requestData);
-        Debug.Log($"Gemini'ye gönderilen JSON: {jsonData}");
-
-        using (UnityWebRequest geminiRequest = new UnityWebRequest(apiUrl, "POST"))
-        {
-            byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonData);
-            geminiRequest.uploadHandler = new UploadHandlerRaw(bodyRaw);
-            geminiRequest.downloadHandler = new DownloadHandlerBuffer();
-            geminiRequest.SetRequestHeader("Content-Type", "application/json");
-
-            yield return geminiRequest.SendWebRequest();
-
-            if (geminiRequest.result != UnityWebRequest.Result.Success)
-            {
-                Debug.LogError($"Gemini API Hatası: {geminiRequest.error}\nYanıt Metni: {geminiRequest.downloadHandler.text}");
-                yield break;
-            }
-
-            string responseJson = geminiRequest.downloadHandler.text;
-            string aiResponse = "";
-            try
-            {
-                int start = responseJson.IndexOf("\"text\": \"") + 9;
-                int end = responseJson.IndexOf("\"", start);
-                aiResponse = responseJson.Substring(start, end - start);
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"Gemini yanıtı parse edilirken hata oluştu: {e.Message}");
-                Debug.Log($"Yanıt: {responseJson}");
-                aiResponse = "Üzgünüm, yanıtınızı işleyemedim.";
-            }
-
-            Debug.Log($"🤖 Yapay Zeka Yanıtı: {aiResponse}");
-
-            yield return StartCoroutine(GenerateSpeech(aiResponse, voiceId));
-        }
-    }
-    */
-
-    public void GelenMetniSeseCevir(string metin)
-    {
-        Debug.Log($"ELEVENLABS BİLDİRİYOR: Sese çevirmek için şu metni aldım: '{metin}'");
-
-        if (string.IsNullOrEmpty(metin))
+        if (string.IsNullOrEmpty(cevap))
         {
             Debug.LogWarning("Sese çevrilecek metin boş.");
             return;
+        }else if (cevap != null)
+        {
+            StartCoroutine(GenerateSpeech(cevap, voiceId));
+            Debug.LogWarning("Metin ses çevrilmek üzere yönlendirildi");
         }
+        
+        
     }
-
 
         IEnumerator GenerateSpeech(string metin, string voiceId)
     {
