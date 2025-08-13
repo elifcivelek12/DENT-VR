@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 using System.Text;
 using System;
+using UnityEngine.InputSystem; // VR kontrolcüleri için Input System'ı kullanıyoruz.
 
 // ElevenLabs STT API'sinden gelen JSON yanıtı için sınıf.
 [System.Serializable]
@@ -47,7 +48,7 @@ public class ElevenLabsVoiceDemo : MonoBehaviour
     public string elevenlabsApiKey = "BURAYA_API_KEY";
     // Gemini API Anahtarınızı buraya girin.
     public string geminiApiKey = "BURAYA_API_KEY";
-
+    
     // Sesi çalacak AudioSource bileşeni.
     public AudioSource audioSource;
     // ElevenLabs için kullanılacak ses kimliği.
@@ -55,13 +56,16 @@ public class ElevenLabsVoiceDemo : MonoBehaviour
     public string voiceId = "EXAVITQu4vr4xnSDxMaL";
 
     // Mikrofon kayıt ayarları.
-    // Bu değeri boş bırakırsanız varsayılan mikrofon kullanılır.
     public string microphoneDeviceName;
     private AudioClip microphoneClip;
     private bool isRecording = false;
 
     // Karşılıklı konuşma için kontrol değişkenleri
     private bool isAwaitingResponse = false;
+    
+    // VR kontrolcü girdileri için değişkenler.
+    // Bu InputActionReference'ları Unity'de atamanız gerekecek.
+    public InputActionReference startRecordingAction;
 
     void Start()
     {
@@ -85,31 +89,21 @@ public class ElevenLabsVoiceDemo : MonoBehaviour
                 return;
             }
         }
-
-        Debug.Log("Uygulama hazır! Kayıt başlatmak için 'R' tuşuna basın.");
+        
+        Debug.Log("Uygulama hazır! VR kontrolcünüzün belirlenen tuşuna basarak kaydı başlatın.");
+        
+        // VR kontrolcü girdilerini dinlemeyi başlat.
+        startRecordingAction.action.started += ctx => StartRecording();
+        startRecordingAction.action.canceled += ctx => StopRecording();
+        startRecordingAction.action.Enable();
     }
-
-    // Her frame'de çalışan Unity metodu.
-    void Update()
+    
+    void OnDestroy()
     {
-        // Eğer kayıt devam etmiyorsa, tuşa basarak kaydı başlatabiliriz.
-        if (!isRecording && !isAwaitingResponse && Input.GetKeyDown(KeyCode.R))
-        {
-            StartRecording();
-        }
-
-        // Eğer kayıt devam ediyorsa ve tuşa basarak durdurulmak isteniyorsa.
-        if (isRecording && Input.GetKeyUp(KeyCode.R))
-        {
-            StopRecording();
-        }
-
-        // Eğer bir yanıt bekleniyorsa ve ses çalma işlemi bittiyse, yeni bir kayıt başlat.
-        if (isAwaitingResponse && !audioSource.isPlaying)
-        {
-            isAwaitingResponse = false;
-            StartRecording();
-        }
+        // Script yok edildiğinde dinleyicileri kapat.
+        startRecordingAction.action.started -= ctx => StartRecording();
+        startRecordingAction.action.canceled -= ctx => StopRecording();
+        startRecordingAction.action.Disable();
     }
 
     // Mikrofon kaydını başlatır.
@@ -121,9 +115,8 @@ public class ElevenLabsVoiceDemo : MonoBehaviour
             return;
         }
 
-        Debug.Log("🎙️ Mikrofon kaydı başladı... Konuşmanızı tamamlayıp tuşu bırakın.");
+        Debug.Log("🎙 Mikrofon kaydı başladı... Konuşmanızı tamamlayıp tuşu bırakın.");
         // Mikrofonu 10 saniye süreyle 16000 Hz frekansta kaydetmeye başla.
-        // ElevenLabs STT API'si 16000 Hz'yi tercih eder.
         microphoneClip = Microphone.Start(microphoneDeviceName, false, 10, 16000);
         isRecording = true;
     }
@@ -138,8 +131,7 @@ public class ElevenLabsVoiceDemo : MonoBehaviour
         }
 
         Debug.Log("🛑 Mikrofon kaydı durduruldu. Yanıt bekleniyor...");
-
-        // Mikrofonun pozisyonunu kaydı sonlandırmadan önce al.
+        
         int position = Microphone.GetPosition(microphoneDeviceName);
         Microphone.End(microphoneDeviceName);
         isRecording = false;
@@ -147,21 +139,17 @@ public class ElevenLabsVoiceDemo : MonoBehaviour
 
         if (position > 0)
         {
-            // Mikrofon verisinden bir alt-klip oluşturun (istenirse)
             AudioClip processedClip = GetSubClip(microphoneClip, 0, position);
-
-            // Ses işleme sürecini başlat.
             StartCoroutine(ProcessAudio(processedClip));
         }
         else
         {
             Debug.LogError("Kayıt sırasında ses verisi alınamadı. Lütfen daha uzun süre konuşmayı deneyin.");
-            // Hata durumunda yeni bir kayıt döngüsü başlat.
             isAwaitingResponse = false;
             StartRecording();
         }
     }
-
+    
     // Mikrofon klibinden sadece konuşma olan kısmı almak için yardımcı metod.
     private AudioClip GetSubClip(AudioClip originalClip, int startSample, int endSample)
     {
@@ -283,7 +271,7 @@ public class ElevenLabsVoiceDemo : MonoBehaviour
 
     IEnumerator GenerateSpeech(string text, string voiceId)
     {
-        Debug.Log($"🗣️ TTS (Text-to-Speech) işlemi başlıyor... Kullanılan ses kimliği: {voiceId}");
+        Debug.Log($"🗣 TTS (Text-to-Speech) işlemi başlıyor... Kullanılan ses kimliği: {voiceId}");
 
         string ttsUrl = $"https://api.elevenlabs.io/v1/text-to-speech/{voiceId}";
 
