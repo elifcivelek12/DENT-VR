@@ -263,9 +263,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   elevenlabsApiKey: sk_55696848c629da3ac68178616759727b23e362434fcbd56f
   geminiApiKey: AIzaSyAJGEMjR2D5QgBDCUjznoF2fCzgfIWLmi0
-  inputClip: {fileID: 8300000, guid: c1b60822a40a1ef449f79c20fe192c5b, type: 3}
   audioSource: {fileID: 297273569}
   voiceId: NNn9dv8zq2kUo7d3JSGG
+  microphoneDeviceName: 
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0
