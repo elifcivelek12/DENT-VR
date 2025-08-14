@@ -4,7 +4,8 @@ using UnityEngine;
 using UnityEngine.Networking;
 using System.Text;
 using System;
-using UnityEngine.InputSystem; // VR kontrolcüleri için Input System'ı kullanıyoruz.
+using UnityEngine.InputSystem;
+using UnityEngine.Events;
 
 // ElevenLabs STT API'sinden gelen JSON yanıtı için sınıf.
 [System.Serializable]
@@ -45,15 +46,16 @@ public class GeminiRequest
 public class ElevenLabsVoiceDemo : MonoBehaviour
 {
     // ElevenLabs API Anahtarınızı buraya girin.
-    public string elevenlabsApiKey = "BURAYA_API_KEY";
-    // Gemini API Anahtarınızı buraya girin.
-    public string geminiApiKey = "BURAYA_API_KEY";
+    private string elevenlabsApiKey = "sk_55696848c629da3ac68178616759727b23e362434fcbd56f";    
     
     // Sesi çalacak AudioSource bileşeni.
     public AudioSource audioSource;
     // ElevenLabs için kullanılacak ses kimliği.
     // Bu değeri Unity Inspector'dan belirleyebilirsiniz.
-    public string voiceId = "EXAVITQu4vr4xnSDxMaL";
+    public string voiceId = "NNn9dv8zq2kUo7d3JSGG";
+
+    [Header("Olaylar (Events)")]
+    public UnityEvent<string> onTextTranscribed;
 
     // Mikrofon kayıt ayarları.
     public string microphoneDeviceName;
@@ -70,7 +72,7 @@ public class ElevenLabsVoiceDemo : MonoBehaviour
     void Start()
     {
         // Gerekli bileşenlerin ve parametrelerin tanımlı olup olmadığını kontrol et.
-        if (audioSource == null || string.IsNullOrEmpty(elevenlabsApiKey) || string.IsNullOrEmpty(geminiApiKey))
+        if (audioSource == null || string.IsNullOrEmpty(elevenlabsApiKey))
         {
             Debug.LogError("Eksik parametreler! audioSource, ElevenLabs API Key ve Gemini API Key girilmelidir.");
             return;
@@ -205,77 +207,40 @@ public class ElevenLabsVoiceDemo : MonoBehaviour
             string transcript = sttData.text;
             Debug.Log($"📜 Çözümlenen Metin: {transcript}");
 
-            yield return StartCoroutine(GenerateResponseWithAI(transcript));
+            //yield return StartCoroutine(GenerateResponseWithAI(transcript));
+            if (onTextTranscribed != null)
+            {
+                onTextTranscribed.Invoke(transcript);
+            }
         }
     }
-
-    IEnumerator GenerateResponseWithAI(string userPrompt)
+    
+     public void GelenMetniSeseCevir(string cevap)
     {
-        Debug.Log("🧠 Yapay zeka yanıtı oluşturuluyor...");
+        Debug.Log($"ELEVENLABS BİLDİRİYOR: Gemini 1.5'den alınan metin: '{cevap}'");
 
-        string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={geminiApiKey}";
-
-        GeminiRequest requestData = new GeminiRequest
+        if (string.IsNullOrEmpty(cevap))
         {
-            contents = new Content[]
-            {
-                new Content
-                {
-                    role = "user",
-                    parts = new Part[]
-                    {
-                        new Part { text = userPrompt }
-                    }
-                }
-            }
-        };
-
-        string jsonData = JsonUtility.ToJson(requestData);
-        Debug.Log($"Gemini'ye gönderilen JSON: {jsonData}");
-
-        using (UnityWebRequest geminiRequest = new UnityWebRequest(apiUrl, "POST"))
+            Debug.LogWarning("Sese çevrilecek metin boş.");
+            return;
+        }else if (cevap != null)
         {
-            byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonData);
-            geminiRequest.uploadHandler = new UploadHandlerRaw(bodyRaw);
-            geminiRequest.downloadHandler = new DownloadHandlerBuffer();
-            geminiRequest.SetRequestHeader("Content-Type", "application/json");
-
-            yield return geminiRequest.SendWebRequest();
-
-            if (geminiRequest.result != UnityWebRequest.Result.Success)
-            {
-                Debug.LogError($"Gemini API Hatası: {geminiRequest.error}\nYanıt Metni: {geminiRequest.downloadHandler.text}");
-                yield break;
-            }
-
-            string responseJson = geminiRequest.downloadHandler.text;
-            string aiResponse = "";
-            try
-            {
-                int start = responseJson.IndexOf("\"text\": \"") + 9;
-                int end = responseJson.IndexOf("\"", start);
-                aiResponse = responseJson.Substring(start, end - start);
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"Gemini yanıtı parse edilirken hata oluştu: {e.Message}");
-                Debug.Log($"Yanıt: {responseJson}");
-                aiResponse = "Üzgünüm, yanıtınızı işleyemedim.";
-            }
-
-            Debug.Log($"🤖 Yapay Zeka Yanıtı: {aiResponse}");
-
-            yield return StartCoroutine(GenerateSpeech(aiResponse, voiceId));
+            StartCoroutine(GenerateSpeech(cevap, voiceId));
+            Debug.LogWarning("Metin ses çevrilmek üzere yönlendirildi");
         }
+        
+        
     }
 
-    IEnumerator GenerateSpeech(string text, string voiceId)
+        IEnumerator GenerateSpeech(string metin, string voiceId)
     {
         Debug.Log($"🗣 TTS (Text-to-Speech) işlemi başlıyor... Kullanılan ses kimliği: {voiceId}");
 
+
+
         string ttsUrl = $"https://api.elevenlabs.io/v1/text-to-speech/{voiceId}";
 
-        TTSRequest requestData = new TTSRequest { text = text };
+        TTSRequest requestData = new TTSRequest { text = metin };
         string jsonData = JsonUtility.ToJson(requestData);
 
         using (UnityWebRequest ttsRequest = new UnityWebRequest(ttsUrl, "POST"))
