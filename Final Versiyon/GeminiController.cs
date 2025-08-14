@@ -6,18 +6,34 @@ using TMPro;
 using Newtonsoft.Json;
 using UnityEngine.Events;
 using System.Text.RegularExpressions;
+using System;
 
 // --- API Sýnýflarý (Deðiþiklik Yok) ---
 public class GeminiApiResponse { [JsonProperty("candidates")] public Candidate[] Candidates; }
 public class Candidate { [JsonProperty("content")] public GeminiContent Content; }
 public class GeminiContent { [JsonProperty("parts")] public GeminiPart[] Parts; }
 public class GeminiPart { [JsonProperty("text")] public string Text; }
-[System.Serializable]
-public class CocukTepki { [JsonProperty("kategori")] public string Kategori; [JsonProperty("tepki")] public string Tepki; }
 
+[System.Serializable]
+public class CocukTepki
+{
+    [JsonProperty("kategori")]
+    public string Kategori;
+
+    [JsonProperty("tepki")]
+    public string Tepki;
+
+    [JsonProperty("animasyon")]
+    public string Animasyon; // Yeni eklendi
+
+    [JsonProperty("duygu")]
+    public string Duygu; // Yeni eklendi
+}
 
 public class GeminiController : MonoBehaviour
 {
+
+    
     [Header("API Ayarlarý")]
     // Deðiþkeni private yapýp [SerializeField] eklemek, onu Inspector'da gösterir
     // ama diðer script'lerden doðrudan eriþilmesini engeller. Bu daha iyi bir pratiktir.
@@ -29,28 +45,33 @@ public class GeminiController : MonoBehaviour
     public TMP_Text sonucText;
 
     [Header("Olaylar (Events)")]
-    [Tooltip("Gemini bir çocuk tepkisi ürettiðinde bu olay tetiklenir.")]
     public UnityEvent<string> onCocukTepkisiUretildi;
+    public static event Action<string> onDuyguBelirlendi;
 
     private const string MODEL_NAME = "gemini-1.5-flash";
     private string _apiURL;
 
     private const string SYSTEM_PRIMER = @"
-Sen bir VR diþ hekimi simülasyonunda 8 yaþýnda hafif gýcýk bir kýz çocuðusun.
-Görevin:
-1) Doktorun cümlesini ""olumlu"", ""olumsuz"" veya ""notr"" (nötr) olarak sýnýflandýr.
-2) Bu kategoriye uygun, doðal, kýsa ve çocukça TEK bir tepki cümlesi üret.
-   - Basit kelimeler, 5-12 kelime.
-   - En fazla 1 emoji.
-   - Tehdit, suçlama, týbbi talimat yok.
-   - Korkutucu veya yetiþkinvari ifadeler yok.
+Sen bir VR diþ hekimi simülasyonunda 8 yaþýnda bir kýz çocuðusun.
+Görev:
+1) Doktorun cümlesini 'pozitif', 'negatif' veya 'nötr' olarak sýnýflandýr.
+2) Kýsa, doðal ve çocukça bir tepki üret.
+3) Tepkiye uygun animasyon seç.
+4) Duyguyu belirt.
 
-YANITINI **yalnýzca** þu JSON biçiminde ver:
+JSON formatýnda dön:
 {
-  ""kategori"": ""olumlu|olumsuz|notr"",
-  ""tepki"": ""<tek cümle>""
+    ""kategori"": ""pozitif|negatif|nötr"",
+    ""tepki"": ""<çocuðun kýsa cevabý>"",
+    ""animasyon"": ""<oynatýlacak animasyon>"",
+    ""duygu"": ""olumlu|kötü""
 }
-JSON dýþýnda metin yazma.";
+JSON dýþýnda metin yazma.
+
+Örnekler:
+- Pozitif: ""Çok cesursun, aferin sana."", animasyon: ""gülümseme"", duygu: ""mutlu""
+- Negatif: ""Hareket edersen acýyabilir."", animasyon: ""korku"", duygu: ""endiþeli""
+- Nötr: ""Lütfen koltuða otur."", animasyon: ""bekleme"", duygu: ""nötr"" ";
 
     void Awake()
     {
@@ -88,7 +109,7 @@ JSON dýþýnda metin yazma.";
 
             yield return request.SendWebRequest();
 
-            CocukTepki sonuc = null; 
+            CocukTepki sonuc = null;
 
             if (request.result != UnityWebRequest.Result.Success)
             {
@@ -110,10 +131,10 @@ JSON dýþýnda metin yazma.";
                     string temizlenmisJson = modelinUrettigiText; // Varsayýlan deðer
                     if (match.Success)
                     {
-                        temizlenmisJson = match.Value; 
+                        temizlenmisJson = match.Value;
                     }
 
-                    
+
                     sonuc = JsonConvert.DeserializeObject<CocukTepki>(temizlenmisJson);
                 }
                 catch (System.Exception e)
@@ -123,22 +144,29 @@ JSON dýþýnda metin yazma.";
                 }
             }
 
-            // 4. Tüm iþlemler bittikten sonra sonucun baþarýlý olup olmadýðýný kontrol et
             if (sonuc != null)
             {
                 if (sonucText != null)
-                    sonucText.text = $"Kategori: {sonuc.Kategori}\nÇocuk: {sonuc.Tepki}";
+                {
+                    sonucText.text = $"Kategori: {sonuc.Kategori}\n" +
+                                     $"Tepki: {sonuc.Tepki}\n" +
+                                     $"Animasyon: {sonuc.Animasyon}\n" +
+                                     $"Duygu: {sonuc.Duygu}";
+                }
 
-                Debug.Log($"Baþarýlý! Kategori: {sonuc.Kategori}, Tepki: {sonuc.Tepki}");
+                Debug.Log($"Baþarýlý! Kategori: {sonuc.Kategori}, Tepki: {sonuc.Tepki}, Animasyon: {sonuc.Animasyon}, Duygu: {sonuc.Duygu}");
 
                 if (onCocukTepkisiUretildi != null)
                 {
-                    onCocukTepkisiUretildi.Invoke(sonuc.Tepki);
+                    onCocukTepkisiUretildi.Invoke(sonuc.Tepki);                    
+
+                }               
+                if ( onDuyguBelirlendi != null )
+                {
+                    onDuyguBelirlendi.Invoke(sonuc.Duygu);
                 }
-            }
-            else
-            {
-                Debug.LogError("Ýþlem sonunda 'sonuc' deðiþkeni null kaldý. Yanýt üretilemedi.");
+
+
             }
         }
     }
