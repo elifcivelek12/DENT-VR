@@ -4,7 +4,6 @@ using UnityEngine;
 
 public class ConsoleTester : MonoBehaviour
 {
-    // OBSERVER: Bu kanal artık basit bir string yerine tam bir "AIResponse" nesnesi yayınlıyor.
     public static event Action<AIResponse> OnAIResponseReceived;
 
     [Header("Test Cümleleri")]
@@ -44,14 +43,6 @@ public class ConsoleTester : MonoBehaviour
             return;
         }
 
-        AIResponse response = new AIResponse
-        {
-            OriginalSentence = parts[0].Trim(),
-            Duygu = parts[1].Trim(),
-            Tepki = parts[2].Trim()
-        };
 
-        // Hazırlanan yapılandırılmış veriyi tüm dinleyicilere anons et.
-        OnAIResponseReceived?.Invoke(response);
     }
 }

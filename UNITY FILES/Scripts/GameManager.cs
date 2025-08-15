@@ -30,14 +30,14 @@ public class GameManager : MonoBehaviour
     {
         // Gerekli olayları dinlemeye başla
         GeminiController.onKonusmaBitti += EndLevel;
-        EmotionObserver.onAnalysisComplete += DisplayFinalResults;
+        EmotionObserver.onAnalizTamamlandı += DisplayFinalResults;
     }
 
     void OnDisable()
     {
         // Dinlemeyi bırak
         GeminiController.onKonusmaBitti -= EndLevel;
-        EmotionObserver.onAnalysisComplete -= DisplayFinalResults;
+        EmotionObserver.onAnalizTamamlandı -= DisplayFinalResults;
     }
 
     // Bu metodu Unity'deki butona bağlayacağız

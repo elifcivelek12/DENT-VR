@@ -7,12 +7,33 @@ using Newtonsoft.Json;
 using UnityEngine.Events;
 using System.Text.RegularExpressions;
 using System;
+using System.Collections.Generic;
 
-// --- API S�n�flar� (De�i�iklik Yok) ---
+
 public class GeminiApiResponse { [JsonProperty("candidates")] public Candidate[] Candidates; }
 public class Candidate { [JsonProperty("content")] public GeminiContent Content; }
 public class GeminiContent { [JsonProperty("parts")] public GeminiPart[] Parts; }
 public class GeminiPart { [JsonProperty("text")] public string Text; }
+public class GeminiMultiTurnRequest
+{
+    [JsonProperty("contents")]
+    public List<ContentEntry> Contents { get; set; }
+}
+
+public class ContentEntry
+{
+    [JsonProperty("role")]
+    public string Role { get; set; } // "user" ya da "model" olacak
+
+    [JsonProperty("parts")]
+    public RequestPart[] Parts { get; set; }
+}
+
+public class RequestPart
+{
+    [JsonProperty("text")]
+    public string Text { get; set; }
+}
 
 [System.Serializable]
 public class CocukTepki
@@ -24,37 +45,37 @@ public class CocukTepki
     public string Tepki;
 
     [JsonProperty("animasyon")]
-    public string Animasyon; // Yeni eklendi
+    public string Animasyon; 
 
     [JsonProperty("duygu")]
-    public string Duygu; // Yeni eklendi
+    public string Duygu; 
 }
 
 public class GeminiController : MonoBehaviour
 {
 
 
-    [Header("API Ayarlar�")]
-    // De�i�keni private yap�p [SerializeField] eklemek, onu Inspector'da g�sterir
-    // ama di�er script'lerden do�rudan eri�ilmesini engeller. Bu daha iyi bir pratiktir.
-    [SerializeField, Tooltip("Google Gemini API Anahtar�n�z")]
+    [Header("API Ayarları")]
+    [SerializeField, Tooltip("Google Gemini API Anahtarınız")]
     private string geminiApiKey = "AIzaSyAJGEMjR2D5QgBDCUjznoF2fCzgfIWLmi0";
 
     [Header("UI Ba�lant�lar�")]
     [Tooltip("Sonucun g�sterilece�i TextMeshPro nesnesi")]
     public TMP_Text sonucText;
 
+    public static event Action<AIResponse> onAIResponseAlındı;
     public static event Action<string, string> onKonusmaGecmisiEklendi;
     public static event Action<string> onCocukTepkisiUretildi;
     public static event Action<string> onDuyguBelirlendi;
     public static event Action onKonusmaBitti;
+    public static event Action<string> onCocukAnimSecildi;
 
     [Header("Oyun Ak��� Ayarlar�")]
     [SerializeField, Tooltip("Seviyenin bitmesi i�in gereken toplam konu�ma say�s�.")]
     private int seviyeBitisKonusmaSayisi = 3;
     private int konusmaSayaci = 0;
 
-
+    private List<string> currentConversationHistory;
     private const string MODEL_NAME = "gemini-1.5-flash";
     private string _apiURL;
 
@@ -69,16 +90,16 @@ G�rev:
 JSON format�nda d�n:
 {
     ""kategori"": ""pozitif|negatif|n�tr"",
-    ""tepki"": ""<�ocu�un k�sa cevab�>"",
-    ""animasyon"": ""<oynat�lacak animasyon>"",
-    ""duygu"": ""olumlu|k�t�""
+    ""tepki"": ""<cocugun kısa cevabı>"",
+    ""animasyon"": ""aglama|gulme|bekleme|korkma"",
+    ""duygu"": ""olumlu|kotu""
 }
 JSON d���nda metin yazma.
 
 �rnekler:
-- Pozitif: ""�ok cesursun, aferin sana."", animasyon: ""g�l�mseme"", duygu: ""mutlu""
-- Negatif: ""Hareket edersen ac�yabilir."", animasyon: ""korku"", duygu: ""endi�eli""
-- N�tr: ""L�tfen koltu�a otur."", animasyon: ""bekleme"", duygu: ""n�tr"" ";
+- Pozitif: ""Cok cesursun, aferin sana."", animasyon: ""gulumseme"", duygu: ""mutlu""
+- Negatif: ""Hareket edersen acıyabilir."", animasyon: ""korkma"", duygu: ""endiseli""
+- Notr: ""Lutfen koltuga otur."", animasyon: ""bekleme"", duygu: ""n�tr"" ";
 
     void Awake()
     {
@@ -87,29 +108,36 @@ JSON d���nda metin yazma.
 
     void OnEnable()
     {
+        EmotionObserver.onKonusmaGecmisiGuncellendi += GecmisiAlVeGeminiyeGonder;
         ElevenLabsVoiceDemo.onTextTranscribed += MetniAlVeGeminiyeGonder;
         GameManager.onLevelStart += KonusmaSayaciniSifirla;
     }
     void OnDisable()
     {
+        EmotionObserver.onKonusmaGecmisiGuncellendi -= GecmisiAlVeGeminiyeGonder;
         ElevenLabsVoiceDemo.onTextTranscribed -= MetniAlVeGeminiyeGonder;
         GameManager.onLevelStart -= KonusmaSayaciniSifirla;
     }
 
-        public void KonusmaSayaciniSifirla() // Artık public olması şart değil, private olabilir.
+    public void KonusmaSayaciniSifirla() 
     {
         konusmaSayaci = 0;
         Debug.Log("GeminiController: Konuşma sayacı sıfırlandı.");
     }
 
+    public void GecmisiAlVeGeminiyeGonder(List<string> updatedHistory)
+    {
+        Debug.Log("Yeni konuşma geçmişi alındı! Toplam satır: " + updatedHistory.Count);
+        this.currentConversationHistory = updatedHistory;
+    }
     public void MetniAlVeGeminiyeGonder(string gelenMetin)
     {
-        Debug.Log($"GeminiController, �u metni i�lemek �zere ald�: '{gelenMetin}'");
-
+        Debug.Log($"GeminiController, su metni islemek uzere ald: '{gelenMetin}'");
+        
         if (string.IsNullOrWhiteSpace(gelenMetin))
         {
-            if (sonucText != null) sonucText.text = "Gelen metin bo�, i�lem yap�lamad�.";
-            Debug.LogWarning("��lenecek metin bo� oldu�u i�in i�lem iptal edildi.");
+            if (sonucText != null) sonucText.text = "Gelen metin bos, islem yapılamadı.";
+            Debug.LogWarning("Islenecek metin bos oldugu icin islem iptal edildi.");
             return;
         }
 
@@ -118,11 +146,51 @@ JSON d���nda metin yazma.
 
     private IEnumerator ClassifyAndRespond(string doktorCumlesi)
     {
-        if (sonucText != null) sonucText.text = "D���n�yor...";
+        if (sonucText != null) sonucText.text = "Dinleniyor...";
 
-        string prompt = $"{SYSTEM_PRIMER}\n\nDoktorun c�mlesi: \"{doktorCumlesi}\"";
-        var requestBody = new { contents = new[] { new { parts = new[] { new { text = prompt } } } } };
+        var requestBody = new GeminiMultiTurnRequest
+        {
+            Contents = new List<ContentEntry>()
+        };
+
+        if (currentConversationHistory != null && currentConversationHistory.Count > 0)
+        {
+            foreach (var line in currentConversationHistory)
+            {
+                string[] parts = line.Split(new[] { ": " }, 2, StringSplitOptions.None);
+                if (parts.Length == 2)
+                {
+                    string speaker = parts[0];
+                    string text = parts[1];
+
+                    // Konuşmacıya göre rolü belirliyoruz. API "user" ve "model" rollerini anlar.
+                    string role = (speaker.ToLower() == "doktor") ? "user" : "model";
+
+                    // Konuşmanın bu parçasını listeye ekliyoruz.
+                    requestBody.Contents.Add(new ContentEntry
+                    {
+                        Role = role,
+                        Parts = new[] { new RequestPart { Text = text } }
+                    });
+                }
+            }
+        }
+
+        // Bu, modele "tüm bu geçmişe ve bu kurallara bakarak ŞİMDİ BU CÜMLEYE cevap ver" demektir.
+        string finalUserPrompt = $"{SYSTEM_PRIMER}\n\n---\n\nDoktorun YENİ cümlesi: \"{doktorCumlesi}\"";
+
+        requestBody.Contents.Add(new ContentEntry
+        {
+            Role = "user",
+            Parts = new[] { new RequestPart { Text = finalUserPrompt } }
+        });
+
+
+
         string jsonRequestBody = JsonConvert.SerializeObject(requestBody);
+
+        Debug.Log("Gemini'ye gönderilen yapılandırılmış JSON:\n" + jsonRequestBody);
+
         byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonRequestBody);
 
         using (UnityWebRequest request = new UnityWebRequest(_apiURL, "POST"))
@@ -135,36 +203,34 @@ JSON d���nda metin yazma.
 
             CocukTepki sonuc = null;
 
+
             if (request.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogError($"Gemini API Hatas�: {request.error}\nYan�t: {request.downloadHandler.text}");
-                if (sonucText != null) sonucText.text = $"Bir API hatas� olu�tu: {request.error}";
+                Debug.LogError($"Gemini API Hatası: {request.error}\nYanıt: {request.downloadHandler.text}");
+                if (sonucText != null) sonucText.text = $"Bir API hatası oluştu: {request.error}";
             }
             else
             {
                 string hamCikti = request.downloadHandler.text;
                 try
                 {
-
                     GeminiApiResponse apiResponse = JsonConvert.DeserializeObject<GeminiApiResponse>(hamCikti);
                     string modelinUrettigiText = apiResponse.Candidates[0].Content.Parts[0].Text;
 
-
                     Match match = Regex.Match(modelinUrettigiText, @"\{.*\}", RegexOptions.Singleline);
 
-                    string temizlenmisJson = modelinUrettigiText; // Varsay�lan de�er
+                    string temizlenmisJson = modelinUrettigiText;
                     if (match.Success)
                     {
                         temizlenmisJson = match.Value;
                     }
 
-
                     sonuc = JsonConvert.DeserializeObject<CocukTepki>(temizlenmisJson);
                 }
                 catch (System.Exception e)
                 {
-                    Debug.LogError($"JSON parse hatas�: {e.Message}\nHam ��kt�: {hamCikti}");
-                    if (sonucText != null) sonucText.text = "Yan�tta ge�erli bir format bulunamad�.";
+                    Debug.LogError($"JSON parse hatası: {e.Message}\nHam Çıktı: {hamCikti}");
+                    if (sonucText != null) sonucText.text = "Yanıtta geçerli bir format bulunamadı.";
                 }
             }
 
@@ -173,29 +239,37 @@ JSON d���nda metin yazma.
                 if (sonucText != null)
                 {
                     sonucText.text = $"Kategori: {sonuc.Kategori}\n" +
-                                     $"Tepki: {sonuc.Tepki}\n" +
-                                     $"Animasyon: {sonuc.Animasyon}\n" +
-                                     $"Duygu: {sonuc.Duygu}";
+                                        $"Tepki: {sonuc.Tepki}\n" +
+                                        $"Animasyon: {sonuc.Animasyon}\n" +
+                                        $"Duygu: {sonuc.Duygu}";
+
+                    AIResponse response = new AIResponse
+                    {
+                        Kategori = sonuc.Kategori,
+                        Tepki = sonuc.Tepki,
+                        Animasyon = sonuc.Animasyon,
+                        Duygu = sonuc.Duygu
+                    };
+                    onAIResponseAlındı?.Invoke(response);
                 }
 
-                Debug.Log($"Ba�ar�l�! Kategori: {sonuc.Kategori}, Tepki: {sonuc.Tepki}, Animasyon: {sonuc.Animasyon}, Duygu: {sonuc.Duygu}");
+                Debug.Log($"Başarılı! Kategori: {sonuc.Kategori}, Tepki: {sonuc.Tepki}, Animasyon: {sonuc.Animasyon}, Duygu: {sonuc.Duygu}");
 
                 onCocukTepkisiUretildi?.Invoke(sonuc.Tepki);
                 onDuyguBelirlendi?.Invoke(sonuc.Duygu);
                 onKonusmaGecmisiEklendi?.Invoke(doktorCumlesi, "Doktor");
                 onKonusmaGecmisiEklendi?.Invoke(sonuc.Tepki, "Çocuk");
+                onCocukAnimSecildi?.Invoke(sonuc.Animasyon);
 
                 konusmaSayaci++;
                 Debug.Log($"Konuşma tamamlandı. Toplam konuşma sayısı: {konusmaSayaci}/{seviyeBitisKonusmaSayisi}");
 
-                // ... (konuşma sayacı mantığı) ...
                 if (konusmaSayaci >= seviyeBitisKonusmaSayisi)
                 {
-                    onKonusmaBitti?.Invoke(); // onKonusmaBitti'yi de static olarak tetikle
+                    onKonusmaBitti?.Invoke();
                 }
-
-
             }
         }
+    
     }
 }

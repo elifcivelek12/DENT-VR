@@ -1,4 +1,3 @@
-// AvatarMoodController.cs
 using UnityEngine;
 
 public class AvatarMoodController : MonoBehaviour
@@ -9,16 +8,14 @@ public class AvatarMoodController : MonoBehaviour
     [Header("Yapılandırma")]
     public PersonalityType personality;
     
-    // YENİ: Animator referansını tutacak değişken.
     [Header("Bağlantılar")]
     [Tooltip("Animasyonları kontrol edilecek avatarın Animator bileşeni.")]
-    public Animator avatarAnimator; // Editörden sürükleyip bırakacağız.
+    public Animator avatarAnimator; 
 
     private IMoodStrategy currentStrategy;
 
     void Start()
     {
-        // Animator'ın atanıp atanmadığını kontrol edelim.
         if (avatarAnimator == null)
         {
             Debug.LogError("Avatar Animator referansı atanmamış! Lütfen Inspector'dan atayın.", this.gameObject);
@@ -38,12 +35,12 @@ public class AvatarMoodController : MonoBehaviour
 
     void OnEnable()
     {
-        ConsoleTester.OnAIResponseReceived += HandleAIResponse;
+        GeminiController.onAIResponseAlındı += HandleAIResponse;
     }
 
     void OnDisable()
     {
-        ConsoleTester.OnAIResponseReceived -= HandleAIResponse;
+        GeminiController.onAIResponseAlındı -= HandleAIResponse;
         if (currentStrategy != null)
         {
             currentStrategy.OnMoodShouldChange -= HandleMoodChange;
@@ -52,9 +49,9 @@ public class AvatarMoodController : MonoBehaviour
 
     void HandleAIResponse(AIResponse response)
     {
-        Debug.Log($"[GÖZLEMCİ] Anons alındı -> Duygu: '{response.Duygu}', Tepki: '{response.Tepki}'.");
+        Debug.Log($"[GÖZLEMCİ] Anons alındı -> Duygu: '{response.Duygu}', Tepki: '{response.Animasyon}'.");
         
-        TriggerInstantReaction(response.Tepki);
+        TriggerInstantReaction(response.Animasyon);
 
         string category = TranslateDuyguToCategory(response.Duygu);
         if (!string.IsNullOrEmpty(category))
@@ -63,37 +60,32 @@ public class AvatarMoodController : MonoBehaviour
         }
     }
 
-    // GÜNCELLENMİŞ FONKSİYON: Artık Debug.Log yerine animasyonları tetikliyor.
-    void TriggerInstantReaction(string tepki)
+    void TriggerInstantReaction(string animasyon)
     {
-        // Animator referansımız yoksa hiçbir şey yapma.
-        if (avatarAnimator == null || tepki == "yok" || string.IsNullOrEmpty(tepki))
+        if (avatarAnimator == null || animasyon == "yok" || string.IsNullOrEmpty(animasyon))
         {
             return;
         }
 
-        // Gelen 'tepki' string'ine göre doğru trigger'ı ateşle.
-        // Buradaki string'ler ("aglama", "gulme") Animator'deki parametre isimleriyle
-        // eşleşmek zorunda DEĞİL, ama tutarlılık için aynı yapmak mantıklıdır.
-        switch (tepki.ToLower())
+        switch (animasyon.ToLower())
         {
             case "aglama":
                 Debug.Log("<color=cyan>!!!!!! ANİMASYON TETİKLENDİ -> aglamaTrigger !!!!!!!</color>");
-                avatarAnimator.SetTrigger("aglamaTrigger"); // Animator'deki parametrenin adını kullanıyoruz.
+                avatarAnimator.SetTrigger("aglamaTrigger"); 
                 break;
 
             case "gulme":
                 Debug.Log("<color=cyan>!!!!!! ANİMASYON TETİKLENDİ -> gulmeTrigger !!!!!!!</color>");
-                avatarAnimator.SetTrigger("gulmeTrigger"); // Animator'deki parametrenin adını kullanıyoruz.
+                avatarAnimator.SetTrigger("gulmeTrigger"); 
                 break;
-            
-            // Gelecekte eklemek isteyebileceğin başka tepkiler...
-            // case "korkma":
-            //     avatarAnimator.SetTrigger("korkmaTrigger");
-            //     break;
+
+            case "korkma":
+                Debug.Log("<color=cyan>!!!!!! ANİMASYON TETİKLENDİ -> korkmaTrigger !!!!!!!</color>");
+                avatarAnimator.SetTrigger("korkmaTrigger");
+                break;
 
             default:
-                Debug.LogWarning($"[AvatarMoodController] Tanımlanmamış tepki geldi: '{tepki}'. Herhangi bir animasyon tetiklenmedi.");
+                Debug.LogWarning($"[AvatarMoodController] Tanımlanmamış tepki geldi: '{animasyon}'. Herhangi bir animasyon tetiklenmedi.");
                 break;
         }
     }
