@@ -33,7 +33,7 @@ public class CocukTepki
 public class GeminiController : MonoBehaviour
 {
 
-    
+
     [Header("API Ayarlarý")]
     // Deðiþkeni private yapýp [SerializeField] eklemek, onu Inspector'da gösterir
     // ama diðer script'lerden doðrudan eriþilmesini engeller. Bu daha iyi bir pratiktir.
@@ -45,6 +45,7 @@ public class GeminiController : MonoBehaviour
     public TMP_Text sonucText;
 
     [Header("Olaylar (Events)")]
+    public UnityEvent<string, string> onKonusmaGecmisiEklendi;
     public UnityEvent<string> onCocukTepkisiUretildi;
     public static event Action<string> onDuyguBelirlendi;
 
@@ -158,12 +159,17 @@ JSON dýþýnda metin yazma.
 
                 if (onCocukTepkisiUretildi != null)
                 {
-                    onCocukTepkisiUretildi.Invoke(sonuc.Tepki);                    
+                    onCocukTepkisiUretildi.Invoke(sonuc.Tepki);
 
-                }               
-                if ( onDuyguBelirlendi != null )
+                }
+                if (onDuyguBelirlendi != null)
                 {
                     onDuyguBelirlendi.Invoke(sonuc.Duygu);
+                }
+                if (onKonusmaGecmisiEklendi != null)
+                {
+                    onKonusmaGecmisiEklendi.Invoke(doktorCumlesi, "Doktor");
+                    onKonusmaGecmisiEklendi.Invoke(sonuc.Tepki, "Çocuk");
                 }
 
 
