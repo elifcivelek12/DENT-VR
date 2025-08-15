@@ -19,8 +19,6 @@ public class CocukTepki { [JsonProperty("kategori")] public string Kategori; [Js
 public class GeminiController : MonoBehaviour
 {
     [Header("API Ayarlarý")]
-    // Deðiþkeni private yapýp [SerializeField] eklemek, onu Inspector'da gösterir
-    // ama diðer script'lerden doðrudan eriþilmesini engeller. Bu daha iyi bir pratiktir.
     [SerializeField, Tooltip("Google Gemini API Anahtarýnýz")]
     private string geminiApiKey = "AIzaSyAJGEMjR2D5QgBDCUjznoF2fCzgfIWLmi0";
 
@@ -28,9 +26,12 @@ public class GeminiController : MonoBehaviour
     [Tooltip("Sonucun gösterileceði TextMeshPro nesnesi")]
     public TMP_Text sonucText;
 
-    [Header("Olaylar (Events)")]
-    [Tooltip("Gemini bir çocuk tepkisi ürettiðinde bu olay tetiklenir.")]
-    public UnityEvent<string> onCocukTepkisiUretildi;
+    // YENÝ: Observer Pattern için UnityEvent
+    // Konuþma metnini ve konuþmacýnýn rolünü (örn: "Doktor") iletir.
+    [Header("Olaylar (Observer Pattern)")]
+    [Tooltip("Yeni bir konuþma parçasý eklendiðinde tetiklenir.")]
+    public UnityEvent<string, string> onConversationPieceAdded;
+    public UnityEvent<string> onChildReact;
 
     private const string MODEL_NAME = "gemini-1.5-flash";
     private string _apiURL;
@@ -40,10 +41,10 @@ Sen bir VR diþ hekimi simülasyonunda 8 yaþýnda hafif gýcýk bir kýz çocuðusun.
 Görevin:
 1) Doktorun cümlesini ""olumlu"", ""olumsuz"" veya ""notr"" (nötr) olarak sýnýflandýr.
 2) Bu kategoriye uygun, doðal, kýsa ve çocukça TEK bir tepki cümlesi üret.
-   - Basit kelimeler, 5-12 kelime.
-   - En fazla 1 emoji.
-   - Tehdit, suçlama, týbbi talimat yok.
-   - Korkutucu veya yetiþkinvari ifadeler yok.
+    - Basit kelimeler, 5-12 kelime.
+    - En fazla 1 emoji.
+    - Tehdit, suçlama, týbbi talimat yok.
+    - Korkutucu veya yetiþkinvari ifadeler yok.
 
 YANITINI **yalnýzca** þu JSON biçiminde ver:
 {
@@ -88,7 +89,7 @@ JSON dýþýnda metin yazma.";
 
             yield return request.SendWebRequest();
 
-            CocukTepki sonuc = null; 
+            CocukTepki sonuc = null;
 
             if (request.result != UnityWebRequest.Result.Success)
             {
@@ -100,20 +101,17 @@ JSON dýþýnda metin yazma.";
                 string hamCikti = request.downloadHandler.text;
                 try
                 {
-
                     GeminiApiResponse apiResponse = JsonConvert.DeserializeObject<GeminiApiResponse>(hamCikti);
                     string modelinUrettigiText = apiResponse.Candidates[0].Content.Parts[0].Text;
 
-
                     Match match = Regex.Match(modelinUrettigiText, @"\{.*\}", RegexOptions.Singleline);
 
-                    string temizlenmisJson = modelinUrettigiText; // Varsayýlan deðer
+                    string temizlenmisJson = modelinUrettigiText;
                     if (match.Success)
                     {
-                        temizlenmisJson = match.Value; 
+                        temizlenmisJson = match.Value;
                     }
 
-                    
                     sonuc = JsonConvert.DeserializeObject<CocukTepki>(temizlenmisJson);
                 }
                 catch (System.Exception e)
@@ -123,7 +121,6 @@ JSON dýþýnda metin yazma.";
                 }
             }
 
-            // 4. Tüm iþlemler bittikten sonra sonucun baþarýlý olup olmadýðýný kontrol et
             if (sonuc != null)
             {
                 if (sonucText != null)
@@ -131,10 +128,12 @@ JSON dýþýnda metin yazma.";
 
                 Debug.Log($"Baþarýlý! Kategori: {sonuc.Kategori}, Tepki: {sonuc.Tepki}");
 
-                if (onCocukTepkisiUretildi != null)
-                {
-                    onCocukTepkisiUretildi.Invoke(sonuc.Tepki);
-                }
+                // YENÝ: Observer'lara olay fýrlatýlýyor.
+                // Hem doktorun cümlesi hem de çocuðun tepkisi gönderiliyor.
+                onConversationPieceAdded?.Invoke(doktorCumlesi, "Doktor");
+                onConversationPieceAdded?.Invoke(sonuc.Tepki, "Çocuk");
+                onChildReact?.Invoke(sonuc.Tepki);
+               
             }
             else
             {
@@ -143,3 +142,8 @@ JSON dýþýnda metin yazma.";
         }
     }
 }
+
+
+
+
+
