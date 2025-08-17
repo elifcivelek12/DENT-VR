@@ -6,6 +6,7 @@ using System.Text;
 using System;
 using TMPro;
 using Newtonsoft.Json;
+using UnityEngine.Rendering;
 
 public class GeminiRequestPartObserver { [JsonProperty("text")] public string Text; }
 public class GeminiRequestContentObserver { [JsonProperty("parts")] public GeminiRequestPartObserver[] Parts; }
@@ -20,7 +21,7 @@ public class EmotionObserver : MonoBehaviour
         public float PositiveScore;
         public float NeutralScore;
         public float NegativeScore;
-        public string Summary;
+        public string feedback;
     }
 
     public static event Action<List<string>> onKonusmaGecmisiGuncellendi;
@@ -28,8 +29,9 @@ public class EmotionObserver : MonoBehaviour
 
     [System.Serializable]
     public class EmotionScores { [JsonProperty("negative")] public float Negative; [JsonProperty("neutral")] public float Neutral; [JsonProperty("positive")] public float Positive; }
+    public class Summary { [JsonProperty("feedback")] public string feedback; }
     [System.Serializable]
-    public class GeminiEmotionResponse { [JsonProperty("emotionScores")] public EmotionScores EmotionScores; }
+    public class GeminiEmotionResponse { [JsonProperty("emotionScores")] public EmotionScores EmotionScores; [JsonProperty("summary")] public Summary Summary; }
 
     [SerializeField, Tooltip("Google Gemini API Anahtarınız")]
     private string geminiApiKey = "AIzaSyAJGEMjR2D5QgBDCUjznoF2fCzgfIWLmi0";
@@ -40,7 +42,7 @@ public class EmotionObserver : MonoBehaviour
     {
         if (string.IsNullOrEmpty(geminiApiKey))
         {
-            Debug.LogError("Gemini API Anahtarı eksik! Lütfen Inspector'dan girin.");
+            Debug.LogError("Gemini API Anahtarı eksik!");
         }
     }
 
@@ -77,13 +79,11 @@ public class EmotionObserver : MonoBehaviour
     {
         string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={geminiApiKey}";
 
-        // 1. Tıpkı GeminiController'da olduğu gibi yapılandırılmış bir istek oluşturuyoruz.
         var requestBody = new GeminiMultiTurnRequest
         {
             Contents = new List<ContentEntry>()
         };
 
-        // 2. Biriktirdiğimiz konuşma geçmişini rollere ayırarak listeye ekliyoruz.
         foreach (var line in conversationHistory)
         {
             string[] parts = line.Split(new[] { ": " }, 2, StringSplitOptions.None);
@@ -101,19 +101,24 @@ public class EmotionObserver : MonoBehaviour
             }
         }
 
-        // 3. Analiz talimatını, tüm konuşma geçmişinden sonra, son bir "user" mesajı olarak ekliyoruz.
-        // Bu, modele "Yukarıdaki konuşmayı oku ve ŞİMDİ sana vereceğim talimatı uygula" demektir.
         string analysisPrompt = @"
-    Lütfen yukarıdaki konuşma geçmişini analiz et. Sadece doktorun cümlelerine odaklan. 
-    Doktorun genel yaklaşımının pozitif, negatif ve nötr duygu skorlarını yüzde olarak belirle.
-    Cevabını SADECE aşağıdaki JSON formatında ver. Başka hiçbir metin ekleme.
+    Lütfen yukarıdaki konuşma geçmişini analiz et. Hem doktorun hem de cocuğun cumlelerine odaklan. 
+    *Sadece doktorun* genel yaklaşımının pozitif, negatif ve nötr duygu skorlarını yüzde olarak belirle.
+    Tüm konuşma boyunca sohbetin ilerleyişini, doktorun kullandığı kelimelerin cocuk ile iletişime uygunluğunu iki cümlede yorumla, string olarak gönder.
+    Cevabını SADECE aşağıdaki JSON formatında ver. Başka metin ekleme.
 
     {
       ""emotionScores"": {
         ""positive"": <pozitif yüzde>,
         ""neutral"": <nötr yüzde>,
-        ""negative"": <negatif yüzde>
-      }
+        ""negative"": <negatif yüzde>,
+        }
+
+      ""summary"": {
+        ""feedback"": <sohbetin geneli hakkında geribildirim, 10 üzerinden başarı puanı>
+        }      
+      
+      
     }
     ";
 
@@ -124,13 +129,11 @@ public class EmotionObserver : MonoBehaviour
         });
 
 
-        // 4. Yapılandırılmış nesneyi JSON'a çeviriyoruz.
         string jsonData = JsonConvert.SerializeObject(requestBody);
-        Debug.Log("Duygu Analizi için gönderilen JSON:\n" + jsonData); // Hata ayıklama için önemli!
+        Debug.Log("Duygu Analizi için gönderilen JSON:\n" + jsonData);
 
         using (UnityWebRequest geminiRequest = new UnityWebRequest(apiUrl, "POST"))
         {
-            // ... metodun geri kalanı aynı kalabilir ...
             byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonData);
             geminiRequest.uploadHandler = new UploadHandlerRaw(bodyRaw);
             geminiRequest.downloadHandler = new DownloadHandlerBuffer();
@@ -148,7 +151,6 @@ public class EmotionObserver : MonoBehaviour
 
             try
             {
-                // Cevap formatımız değişmediği için burası aynı kalabilir.
                 var apiResponse = JsonConvert.DeserializeObject<GeminiApiResponseObserverFinal>(responseJson);
                 string modelTextOutput = apiResponse.Candidates[0].Content.Parts[0].Text.Trim().Replace("```json", "").Replace("```", "").Trim();
                 var emotionResponse = JsonConvert.DeserializeObject<GeminiEmotionResponse>(modelTextOutput);
@@ -156,19 +158,24 @@ public class EmotionObserver : MonoBehaviour
                 float negativeScore = emotionResponse.EmotionScores.Negative;
                 float neutralScore = emotionResponse.EmotionScores.Neutral;
                 float positiveScore = emotionResponse.EmotionScores.Positive;
-                string summary;
+                string talkfeedback = emotionResponse.Summary.feedback;
 
-                if (positiveScore > 50 && positiveScore > negativeScore) { summary = "Seans genel olarak çok olumlu... (Özet metniniz)"; }
-                else if (negativeScore > 50 && negativeScore > positiveScore) { summary = "Seans, genel olarak olumsuz geçti... (Özet metniniz)"; }
-                else { summary = "Seans, daha çok nötr bir tonda ilerledi... (Özet metniniz)"; }
+                //if (positiveScore > 50 && positiveScore > negativeScore) { summary = "Seans genel olarak çok olumlu... (Özet metniniz)"; }
+                //else if (negativeScore > 50 && negativeScore > positiveScore) { summary = "Seans, genel olarak olumsuz geçti... (Özet metniniz)"; }
+                //else { summary = "Seans, daha çok nötr bir tonda ilerledi... (Özet metniniz)"; }
 
                 AnalysisResult resultData = new AnalysisResult
                 {
                     PositiveScore = positiveScore,
                     NeutralScore = neutralScore,
                     NegativeScore = negativeScore,
-                    Summary = summary
+                    feedback = talkfeedback,
                 };
+
+                if (resultData.feedback == null)
+                {
+                    Debug.Log("FEEDBACK IS NULL");
+                }
 
                 onAnalizTamamlandı?.Invoke(resultData);
             }
@@ -177,6 +184,6 @@ public class EmotionObserver : MonoBehaviour
                 Debug.LogError($"Duygu analizi yanıtı parse edilirken hata oluştu: {e.Message}\nYanıt: {responseJson}");
             }
         }
-    
+
     }
 }

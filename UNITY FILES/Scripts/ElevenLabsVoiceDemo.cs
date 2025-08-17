@@ -68,14 +68,12 @@ public class ElevenLabsVoiceDemo : MonoBehaviour
 
     void Start()
     {
-        // Gerekli bileşenlerin ve parametrelerin tanımlı olup olmadığını kontrol et.
         if (audioSource == null || string.IsNullOrEmpty(elevenlabsApiKey))
         {
             Debug.LogError("Eksik parametreler! audioSource, ElevenLabs API Key ve Gemini API Key girilmelidir.");
             return;
         }
 
-        // Eğer microphoneDeviceName boşsa, ilk bulunan mikrofonu varsayılan olarak kullan.
         if (string.IsNullOrEmpty(microphoneDeviceName))
         {
             if (Microphone.devices.Length > 0)
@@ -88,13 +86,20 @@ public class ElevenLabsVoiceDemo : MonoBehaviour
                 return;
             }
         }
-        
-        Debug.Log("Uygulama hazır! VR kontrolcünüzün belirlenen tuşuna basarak kaydı başlatın.");
-        
-        // VR kontrolcü girdilerini dinlemeyi başlat.
-        startRecordingAction.action.started += ctx => StartRecording();
-        startRecordingAction.action.canceled += ctx => StopRecording();
-        startRecordingAction.action.Enable();
+
+        Debug.Log("Mikrofon baglantısı hazır");
+
+    }
+
+    void Update()
+    {
+        if (GameManager.currentState == GameState.Playing )
+        {
+            startRecordingAction.action.started += ctx => StartRecording();
+            startRecordingAction.action.canceled += ctx => StopRecording();
+            startRecordingAction.action.Enable();
+        }
+    
     }
     void OnEnable()
     {
