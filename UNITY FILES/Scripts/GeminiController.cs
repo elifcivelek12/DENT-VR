@@ -49,6 +49,9 @@ public class CocukTepki
 
     [JsonProperty("duygu")]
     public string Duygu; 
+
+    [JsonProperty("ikna")]
+    public string Ikna; 
 }
 
 public class GeminiController : MonoBehaviour
@@ -72,12 +75,13 @@ public class GeminiController : MonoBehaviour
 
     [Header("Oyun Ak��� Ayarlar�")]
     [SerializeField, Tooltip("Seviyenin bitmesi i�in gereken toplam konu�ma say�s�.")]
-    private int seviyeBitisKonusmaSayisi = 3;
+    private int seviyeBitisKonusmaSayisi = 10;
     private int konusmaSayaci = 0;
 
     private List<string> currentConversationHistory;
     private const string MODEL_NAME = "gemini-1.5-flash";
     private string _apiURL;
+    private List<string> iknaSonuclari = new List<string>();
 
     private const string SYSTEM_PRIMER = @"
 Sen bir VR dis hekimi simulasyonunda 8 yasında bir kız cocugusun.
@@ -143,6 +147,18 @@ JSON d���nda metin yazma.
 
         StartCoroutine(ClassifyAndRespond(gelenMetin));
     }
+
+    private string HesaplaIknaDurumu()  
+    {
+        int evet = iknaSonuclari.FindAll(x => x == "evet").Count;
+        int hayir = iknaSonuclari.FindAll(x => x == "hayır").Count;
+        int kararsiz = iknaSonuclari.FindAll(x => x == "kararsız").Count;
+
+        if (evet > hayir && evet > kararsiz) return "ikna oldu (evet)";
+        if (hayir > evet && hayir > kararsiz) return "ikna olmadı (hayır)";
+        return "kararsız";
+    }
+
 
     private IEnumerator ClassifyAndRespond(string doktorCumlesi)
     {
@@ -242,6 +258,7 @@ JSON d���nda metin yazma.
                                         $"Tepki: {sonuc.Tepki}\n" +
                                         $"Animasyon: {sonuc.Animasyon}\n" +
                                         $"Duygu: {sonuc.Duygu}";
+                                        $"İkna: {sonuc.İkna}";
 
                     AIResponse response = new AIResponse
                     {
@@ -249,6 +266,7 @@ JSON d���nda metin yazma.
                         Tepki = sonuc.Tepki,
                         Animasyon = sonuc.Animasyon,
                         Duygu = sonuc.Duygu
+                        ikna=sonuc.İkna
                     };
                     onAIResponseAlındı?.Invoke(response);
                 }
@@ -260,13 +278,19 @@ JSON d���nda metin yazma.
                 onKonusmaGecmisiEklendi?.Invoke(doktorCumlesi, "Doktor");
                 onKonusmaGecmisiEklendi?.Invoke(sonuc.Tepki, "Çocuk");
                 onCocukAnimSecildi?.Invoke(sonuc.Animasyon);
+                iknaSonuclari.Add(sonuc.Ikna);
+
 
                 konusmaSayaci++;
                 Debug.Log($"Konuşma tamamlandı. Toplam konuşma sayısı: {konusmaSayaci}/{seviyeBitisKonusmaSayisi}");
 
                 if (konusmaSayaci >= seviyeBitisKonusmaSayisi)
                 {
-                    onKonusmaBitti?.Invoke();
+                   string finalIknaDurumu = HesaplaIknaDurumu();
+                   sonucText.text += $"\n\n---\nFinal Karar: Çocuk {finalIknaDurumu}";
+
+                   Debug.Log($"10 diyalog tamamlandı. Final Sonuç: {finalIknaDurumu}");
+                   onKonusmaBitti?.Invoke();
                 }
             }
         }
