@@ -1,26 +1,33 @@
 using UnityEngine;
 
+// Avatarın ruh halini (mood) yapay zekâdan gelen verilere göre yöneten kontrol sınıfı
 public class AvatarMoodController : MonoBehaviour
 {
     [Header("Fabrika Bağlantısı")]
+    // Kişilik profillerini üreten fabrika nesnesi
     public PersonalityFactory factory;
 
     [Header("Yapılandırma")]
+    // Avatarın sahip olacağı kişilik tipi
     public PersonalityType personality;
     
     [Header("Bağlantılar")]
     [Tooltip("Animasyonları kontrol edilecek avatarın Animator bileşeni.")]
+    // Avatarın animasyonlarını oynatmaya yarayan Unity Animator bileşeni
     public Animator avatarAnimator; 
 
+    // O an kullanılan ruh hali stratejisi (ör: StreakBasedStrategy)
     private IMoodStrategy currentStrategy;
 
     void Start()
     {
+        // Avatar Animator atanmazsa hata mesajı ver
         if (avatarAnimator == null)
         {
             Debug.LogError("Avatar Animator referansı atanmamış! Lütfen Inspector'dan atayın.", this.gameObject);
         }
 
+        // Fabrikadan kişilik profili al
         PersonalityProfile profile = factory.GetProfile(personality);
         if (profile == null)
         {
@@ -28,18 +35,23 @@ public class AvatarMoodController : MonoBehaviour
             return;
         }
 
+        // Stratejiyi başlat ve kişilik profilini uygula
         currentStrategy = new StreakBasedStrategy();
         currentStrategy.SetProfile(profile);
+
+        // Strateji ruh hali değişikliği gerektiğinde HandleMoodChange metodunu çağırır
         currentStrategy.OnMoodShouldChange += HandleMoodChange;
     }
 
     void OnEnable()
     {
+        // GeminiController'dan gelen yapay zekâ yanıtlarını dinlemeye başla
         GeminiController.onAIResponseAlındı += HandleAIResponse;
     }
 
     void OnDisable()
     {
+        // Olay aboneliklerini kaldır (bellek kaçağını önlemek için)
         GeminiController.onAIResponseAlındı -= HandleAIResponse;
         if (currentStrategy != null)
         {
@@ -47,12 +59,15 @@ public class AvatarMoodController : MonoBehaviour
         }
     }
 
+    // Yapay zekâdan gelen tepkiyi işle
     void HandleAIResponse(AIResponse response)
     {
         Debug.Log($"[GÖZLEMCİ] Anons alındı -> Duygu: '{response.Duygu}', Tepki: '{response.Animasyon}'.");
-        
+
+        // Eğer animasyon varsa anında tetikle
         TriggerInstantReaction(response.Animasyon);
 
+        // Duyguyu kategoriye çevir ve stratejiye gönder
         string category = TranslateDuyguToCategory(response.Duygu);
         if (!string.IsNullOrEmpty(category))
         {
@@ -60,6 +75,7 @@ public class AvatarMoodController : MonoBehaviour
         }
     }
 
+    // Gelen animasyona göre Animator tetikleyici çalıştır
     void TriggerInstantReaction(string animasyon)
     {
         if (avatarAnimator == null || animasyon == "yok" || string.IsNullOrEmpty(animasyon))
@@ -90,6 +106,7 @@ public class AvatarMoodController : MonoBehaviour
         }
     }
 
+    // Duygu durumunu kategoriye dönüştür (örn: mutlu → olumlu)
     private string TranslateDuyguToCategory(string duygu)
     {
         switch (duygu.ToLower())
@@ -105,6 +122,7 @@ public class AvatarMoodController : MonoBehaviour
         }
     }
 
+    // Ruh hali değiştiğinde tetiklenen metod
     void HandleMoodChange(string newMood)
     {
         Debug.LogWarning($"!!!!!!!! AVATAR RUH HALİ DEĞİŞTİ -> {newMood} !!!!!!!");

@@ -8,23 +8,28 @@ using TMPro;
 using Newtonsoft.Json;
 using UnityEngine.Rendering;
 
+// Gemini API’ye gönderilecek request için gözlemci sınıflar
 public class GeminiRequestPartObserver { [JsonProperty("text")] public string Text; }
 public class GeminiRequestContentObserver { [JsonProperty("parts")] public GeminiRequestPartObserver[] Parts; }
 public class GeminiRequestBodyObserver { [JsonProperty("contents")] public GeminiRequestContentObserver[] Contents; }
 public class GeminiApiResponseObserverFinal { [JsonProperty("candidates")] public CandidateObserverFinal[] Candidates; }
 public class CandidateObserverFinal { [JsonProperty("content")] public GeminiRequestContentObserver Content; }
 
+// Duygu analizini yapan sınıf
 public class EmotionObserver : MonoBehaviour
 {
+    // Analiz sonuçlarını tutacak struct
     public struct AnalysisResult
     {
-        public float PositiveScore;
-        public float NeutralScore;
-        public float NegativeScore;
-        public string feedback;
+        public float PositiveScore;  // Olumlu duygu skoru
+        public float NeutralScore;   // Nötr duygu skoru
+        public float NegativeScore;  // Olumsuz duygu skoru
+        public string feedback;      // Gemini API’den gelen özet veya geri bildirim
     }
 
+    // Konuşma geçmişi güncellendiğinde tetiklenecek event
     public static event Action<List<string>> onKonusmaGecmisiGuncellendi;
+    // Analiz tamamlandığında tetiklenecek event
     public static event Action<AnalysisResult> onAnalizTamamlandı;
 
     [System.Serializable]
@@ -34,12 +39,12 @@ public class EmotionObserver : MonoBehaviour
     public class GeminiEmotionResponse { [JsonProperty("emotionScores")] public EmotionScores EmotionScores; [JsonProperty("summary")] public Summary Summary; }
 
     [SerializeField, Tooltip("Google Gemini API Anahtarınız")]
-    private string geminiApiKey = "AIzaSyAJGEMjR2D5QgBDCUjznoF2fCzgfIWLmi0";
-    private List<string> conversationHistory = new List<string>();
-
+    private string geminiApiKey = "AIzaSyAJGEMjR2D5QgBDCUjznoF2fCzgfIWLmi0"; // API anahtarı
+    private List<string> conversationHistory = new List<string>(); // Konuşma geçmişini tutan liste
 
     void Start()
     {
+        // API anahtarı eksikse hata mesajı ver
         if (string.IsNullOrEmpty(geminiApiKey))
         {
             Debug.LogError("Gemini API Anahtarı eksik!");
@@ -48,42 +53,53 @@ public class EmotionObserver : MonoBehaviour
 
     void OnEnable()
     {
+        // Konuşma geçmişi eklendiğinde ve konuşma bittiğinde eventlere abone ol
         GeminiController.onKonusmaGecmisiEklendi += AddConversation;
         GeminiController.onKonusmaBitti += HandleConversationEnded;
     }
 
     void OnDisable()
     {
+        // Script devre dışı bırakıldığında event aboneliklerini kaldır
         GeminiController.onKonusmaGecmisiEklendi -= AddConversation;
         GeminiController.onKonusmaBitti -= HandleConversationEnded;
     }
 
+    // Yeni bir konuşma eklenince çağrılır
     public void AddConversation(string text, string speakerRole)
     {
+        // Konuşmayı "rol: metin" formatında listeye ekle
         conversationHistory.Add($"{speakerRole}: {text}");
         Debug.Log($"Konuşma geçmişine eklendi: '{speakerRole}: {text}'");
-        onKonusmaGecmisiGuncellendi?.Invoke(conversationHistory);
 
+        // Abonelere güncellenmiş konuşma geçmişini bildir
+        onKonusmaGecmisiGuncellendi?.Invoke(conversationHistory);
     }
 
+    // Konuşma sona erdiğinde çağrılır
     private void HandleConversationEnded()
     {
         Debug.LogWarning("[EmotionObserver] KONUŞMA BİTTİ! Final analiz yapılıyor...");
+
+        // Konuşma geçmişi varsa analiz coroutine’ini başlat
         if (conversationHistory.Count > 0)
         {
             StartCoroutine(AnalyzeEmotions());
         }
     }
 
+    // Konuşma geçmişini Gemini API’ye gönderip duygu analizi yapan coroutine
     IEnumerator AnalyzeEmotions()
     {
         string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={geminiApiKey}";
 
+        // Gönderilecek request body oluşturuluyor
         var requestBody = new GeminiMultiTurnRequest
         {
             Contents = new List<ContentEntry>()
         };
 
+        // Konuşma geçmişini satır satır request formatına dönüştür
         foreach (var line in conversationHistory)
         {
             string[] parts = line.Split(new[] { ": " }, 2, StringSplitOptions.None);
@@ -91,6 +107,7 @@ public class EmotionObserver : MonoBehaviour
             {
                 string speaker = parts[0];
                 string text = parts[1];
+                // Doktor rolü "user", çocuk rolü "model" olarak ayarlanıyor
                 string role = (speaker.ToLower() == "doktor") ? "user" : "model";
 
                 requestBody.Contents.Add(new ContentEntry
@@ -101,6 +118,7 @@ public class EmotionObserver : MonoBehaviour
             }
         }
 
+        // Analiz prompt’u oluşturuluyor, JSON formatında yanıt bekleniyor
         string analysisPrompt = @"
     Lütfen yukarıdaki konuşma geçmişini analiz et. Hem doktorun hem de cocuğun cumlelerine odaklan. 
     *Sadece doktorun* genel yaklaşımının pozitif, negatif ve nötr duygu skorlarını yüzde olarak belirle.
@@ -117,21 +135,21 @@ public class EmotionObserver : MonoBehaviour
       ""summary"": {
         ""feedback"": <sohbetin geneli hakkında geribildirim, 10 üzerinden başarı puanı>
         }      
-      
-      
     }
     ";
 
+        // Analiz prompt’unu request’e ekle
         requestBody.Contents.Add(new ContentEntry
         {
             Role = "user",
             Parts = new[] { new RequestPart { Text = analysisPrompt } }
         });
 
-
+        // JSON’a dönüştür
         string jsonData = JsonConvert.SerializeObject(requestBody);
         Debug.Log("Duygu Analizi için gönderilen JSON:\n" + jsonData);
 
+        // UnityWebRequest ile POST isteği gönder
         using (UnityWebRequest geminiRequest = new UnityWebRequest(apiUrl, "POST"))
         {
             byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonData);
@@ -139,18 +157,22 @@ public class EmotionObserver : MonoBehaviour
             geminiRequest.downloadHandler = new DownloadHandlerBuffer();
             geminiRequest.SetRequestHeader("Content-Type", "application/json");
 
+            // İstek gönderiliyor
             yield return geminiRequest.SendWebRequest();
 
+            // Hata kontrolü
             if (geminiRequest.result != UnityWebRequest.Result.Success)
             {
                 Debug.LogError($"Gemini Duygu Analiz Hatası: {geminiRequest.error}\nYanıt: {geminiRequest.downloadHandler.text}");
                 yield break;
             }
 
+            // Yanıt alındı
             string responseJson = geminiRequest.downloadHandler.text;
 
             try
             {
+                // JSON parse edilip analiz sonuçları elde ediliyor
                 var apiResponse = JsonConvert.DeserializeObject<GeminiApiResponseObserverFinal>(responseJson);
                 string modelTextOutput = apiResponse.Candidates[0].Content.Parts[0].Text.Trim().Replace("```json", "").Replace("```", "").Trim();
                 var emotionResponse = JsonConvert.DeserializeObject<GeminiEmotionResponse>(modelTextOutput);
@@ -160,10 +182,7 @@ public class EmotionObserver : MonoBehaviour
                 float positiveScore = emotionResponse.EmotionScores.Positive;
                 string talkfeedback = emotionResponse.Summary.feedback;
 
-                //if (positiveScore > 50 && positiveScore > negativeScore) { summary = "Seans genel olarak çok olumlu... (Özet metniniz)"; }
-                //else if (negativeScore > 50 && negativeScore > positiveScore) { summary = "Seans, genel olarak olumsuz geçti... (Özet metniniz)"; }
-                //else { summary = "Seans, daha çok nötr bir tonda ilerledi... (Özet metniniz)"; }
-
+                // AnalysisResult struct’ını oluştur
                 AnalysisResult resultData = new AnalysisResult
                 {
                     PositiveScore = positiveScore,
@@ -172,11 +191,13 @@ public class EmotionObserver : MonoBehaviour
                     feedback = talkfeedback,
                 };
 
+                // Eğer geri bildirim boşsa debug log
                 if (resultData.feedback == null)
                 {
                     Debug.Log("FEEDBACK IS NULL");
                 }
 
+                // Analiz tamamlandı event’i tetikleniyor
                 onAnalizTamamlandı?.Invoke(resultData);
             }
             catch (Exception e)
