@@ -2,8 +2,10 @@
 using System;
 using UnityEngine;
 
+// Konsoldan test cümleleri ile yapay zekâ yanıtlarını simüle eden sınıf
 public class ConsoleTester : MonoBehaviour
 {
+    // Yapay zekâ yanıtı alındığında tetiklenen event
     public static event Action<AIResponse> OnAIResponseReceived;
 
     [Header("Test Cümleleri")]
@@ -29,12 +31,12 @@ public class ConsoleTester : MonoBehaviour
         ParseAndSendResponse(neutralResponse);
     }
 
-    // Gelen ham metni ayrıştırıp anonsu yapan merkezi fonksiyon.
+    // Gelen ham metni ayrıştırıp AIResponse oluşturan merkezi fonksiyon
     private void ParseAndSendResponse(string rawText)
     {
         Debug.Log($"[YAYINCI] Ham metin alındı: '{rawText}'. Ayrıştırılıp anons edilecek...");
 
-        // Basit bir ayrıştırma yapıyoruz. Gerçek projede daha sağlam bir yapı (regex vb.) kullanılabilir.
+        // Ham metni "duygu:" ve "tepki:" etiketlerine göre parçala
         string[] parts = rawText.Split(new string[] { "duygu:", "tepki:" }, StringSplitOptions.RemoveEmptyEntries);
 
         if (parts.Length < 3)
@@ -43,6 +45,20 @@ public class ConsoleTester : MonoBehaviour
             return;
         }
 
+        // parts[0] → serbest metin (ör: "Dişçilerden korkuyorum...")
+        // parts[1] → duygu (ör: "uzgun")
+        // parts[2] → tepki (ör: "aglama")
+        AIResponse response = new AIResponse
+        {
+            Kategori = "test", // Test amaçlı sabit kategori veriyoruz
+            Tepki = parts[2].Trim(),
+            Animasyon = parts[2].Trim(),
+            Duygu = parts[1].Trim()
+        };
 
+        Debug.Log($"[YAYINCI] AIResponse üretildi -> Duygu: {response.Duygu}, Tepki: {response.Tepki}");
+
+        // Event'i tetikle → diğer scriptler bu yanıtı dinleyebilir
+        OnAIResponseReceived?.Invoke(response);
     }
 }
