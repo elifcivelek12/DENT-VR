@@ -1,3 +1,4 @@
+
 // Yapay zekâdan gelen yanıtları temsil eden sınıf
 public class AIResponse
 {
@@ -12,5 +13,8 @@ public class AIResponse
     public string Animasyon;
 
     // Yapay zekânın tepki sırasında sergileyeceği duygu durumu 
-    public string Duygu;   
+    public string Duygu;
+
+    // Yapay zekânın ikna durumu
+    public string Ikna; 
 }

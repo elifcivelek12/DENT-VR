@@ -1,33 +1,27 @@
 using UnityEngine;
 
-// Avatarın ruh halini (mood) yapay zekâdan gelen verilere göre yöneten kontrol sınıfı
 public class AvatarMoodController : MonoBehaviour
 {
     [Header("Fabrika Bağlantısı")]
-    // Kişilik profillerini üreten fabrika nesnesi
     public PersonalityFactory factory;
 
     [Header("Yapılandırma")]
-    // Avatarın sahip olacağı kişilik tipi
     public PersonalityType personality;
-    
+
     [Header("Bağlantılar")]
     [Tooltip("Animasyonları kontrol edilecek avatarın Animator bileşeni.")]
-    // Avatarın animasyonlarını oynatmaya yarayan Unity Animator bileşeni
-    public Animator avatarAnimator; 
+    public Animator avatarAnimator;
 
-    // O an kullanılan ruh hali stratejisi (ör: StreakBasedStrategy)
     private IMoodStrategy currentStrategy;
+    private IMoodAnimationFactory currentAnimationFactory; // Mevcut ruh hali animasyon fabrikamız
 
     void Start()
     {
-        // Avatar Animator atanmazsa hata mesajı ver
         if (avatarAnimator == null)
         {
             Debug.LogError("Avatar Animator referansı atanmamış! Lütfen Inspector'dan atayın.", this.gameObject);
         }
 
-        // Fabrikadan kişilik profili al
         PersonalityProfile profile = factory.GetProfile(personality);
         if (profile == null)
         {
@@ -35,23 +29,22 @@ public class AvatarMoodController : MonoBehaviour
             return;
         }
 
-        // Stratejiyi başlat ve kişilik profilini uygula
+        // Başlangıçta Nötr ruh hali fabrikasını ayarla. Bu, null hatası almayı önler.
+        currentAnimationFactory = new NotrMoodAnimationFactory();
+        Debug.Log("[AvatarMoodController] Başlangıç animasyon fabrikası 'NotrMoodAnimationFactory' olarak ayarlandı.");
+
         currentStrategy = new StreakBasedStrategy();
         currentStrategy.SetProfile(profile);
-
-        // Strateji ruh hali değişikliği gerektiğinde HandleMoodChange metodunu çağırır
-        currentStrategy.OnMoodShouldChange += HandleMoodChange;
+        currentStrategy.OnMoodShouldChange += HandleMoodChange; // Ruh hali değişince fabrikayı da değiştir
     }
 
     void OnEnable()
     {
-        // GeminiController'dan gelen yapay zekâ yanıtlarını dinlemeye başla
         GeminiController.onAIResponseAlındı += HandleAIResponse;
     }
 
     void OnDisable()
     {
-        // Olay aboneliklerini kaldır (bellek kaçağını önlemek için)
         GeminiController.onAIResponseAlındı -= HandleAIResponse;
         if (currentStrategy != null)
         {
@@ -59,15 +52,13 @@ public class AvatarMoodController : MonoBehaviour
         }
     }
 
-    // Yapay zekâdan gelen tepkiyi işle
     void HandleAIResponse(AIResponse response)
     {
         Debug.Log($"[GÖZLEMCİ] Anons alındı -> Duygu: '{response.Duygu}', Tepki: '{response.Animasyon}'.");
 
-        // Eğer animasyon varsa anında tetikle
+        // Gelen genel animasyon talebini, mevcut ruh haline göre fabrikadan alıp tetikle
         TriggerInstantReaction(response.Animasyon);
 
-        // Duyguyu kategoriye çevir ve stratejiye gönder
         string category = TranslateDuyguToCategory(response.Duygu);
         if (!string.IsNullOrEmpty(category))
         {
@@ -75,38 +66,39 @@ public class AvatarMoodController : MonoBehaviour
         }
     }
 
-    // Gelen animasyona göre Animator tetikleyici çalıştır
-    void TriggerInstantReaction(string animasyon)
+    // Bu metot artık doğrudan trigger isimlerini bilmiyor, fabrikadan istiyor.
+    void TriggerInstantReaction(string animasyonTipi)
     {
-        if (avatarAnimator == null || animasyon == "yok" || string.IsNullOrEmpty(animasyon))
+        if (avatarAnimator == null || animasyonTipi == "yok" || string.IsNullOrEmpty(animasyonTipi))
         {
             return;
         }
 
-        switch (animasyon.ToLower())
+        IAnimationBehaviour animationBehaviour = null;
+
+        switch (animasyonTipi.ToLower())
         {
             case "aglama":
-                Debug.Log("<color=cyan>!!!!!! ANİMASYON TETİKLENDİ -> aglamaTrigger !!!!!!!</color>");
-                avatarAnimator.SetTrigger("aglamaTrigger"); 
+                animationBehaviour = currentAnimationFactory.CreateAglamaAnimation();
                 break;
 
             case "gulme":
-                Debug.Log("<color=cyan>!!!!!! ANİMASYON TETİKLENDİ -> gulmeTrigger !!!!!!!</color>");
-                avatarAnimator.SetTrigger("gulmeTrigger"); 
+                animationBehaviour = currentAnimationFactory.CreateGulmeAnimation();
                 break;
 
             case "korkma":
-                Debug.Log("<color=cyan>!!!!!! ANİMASYON TETİKLENDİ -> korkmaTrigger !!!!!!!</color>");
-                avatarAnimator.SetTrigger("korkmaTrigger");
+                animationBehaviour = currentAnimationFactory.CreateKorkmaAnimation();
                 break;
 
             default:
-                Debug.LogWarning($"[AvatarMoodController] Tanımlanmamış tepki geldi: '{animasyon}'. Herhangi bir animasyon tetiklenmedi.");
+                Debug.LogWarning($"[AvatarMoodController] Tanımlanmamış animasyon tipi geldi: '{animasyonTipi}'.");
                 break;
         }
+
+        // Fabrikadan gelen animasyon davranışını oynat (null değilse).
+        animationBehaviour?.Play(avatarAnimator);
     }
 
-    // Duygu durumunu kategoriye dönüştür (örn: mutlu → olumlu)
     private string TranslateDuyguToCategory(string duygu)
     {
         switch (duygu.ToLower())
@@ -122,9 +114,25 @@ public class AvatarMoodController : MonoBehaviour
         }
     }
 
-    // Ruh hali değiştiğinde tetiklenen metod
+    // RUH HALİ DEĞİŞTİĞİNDE DOĞRU FABRİKAYI SEÇEN EN ÖNEMLİ METOT
     void HandleMoodChange(string newMood)
     {
         Debug.LogWarning($"!!!!!!!! AVATAR RUH HALİ DEĞİŞTİ -> {newMood} !!!!!!!");
+
+        switch (newMood.ToUpper())
+        {
+            case "İYİ":
+                currentAnimationFactory = new IyiMoodAnimationFactory();
+                Debug.LogWarning("[AvatarMoodController] Animasyon fabrikası 'IyiMoodAnimationFactory' olarak değiştirildi.");
+                break;
+            case "KÖTÜ":
+                currentAnimationFactory = new KotuMoodAnimationFactory();
+                Debug.LogWarning("[AvatarMoodController] Animasyon fabrikası 'KotuMoodAnimationFactory' olarak değiştirildi.");
+                break;
+            default: // Nötr veya tanımsız bir durum için güvenli varsayılan.
+                currentAnimationFactory = new NotrMoodAnimationFactory();
+                Debug.LogWarning("[AvatarMoodController] Animasyon fabrikası 'NotrMoodAnimationFactory' olarak değiştirildi.");
+                break;
+        }
     }
 }

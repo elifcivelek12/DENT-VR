@@ -4,19 +4,19 @@ using UnityEngine;
 
 public static class WavUtility
 {
-    // AudioClip'i WAV formatında bir byte dizisine dönüştürür.
+    // AudioClip'i WAV format�nda bir byte dizisine d�n��t�r�r.
     public static byte[] FromAudioClip(AudioClip clip)
     {
         if (clip == null)
         {
-            Debug.LogError("WavUtility: AudioClip boş.");
+            Debug.LogError("WavUtility: AudioClip bo�.");
             return null;
         }
 
         MemoryStream stream = new MemoryStream();
         int HEADER_SIZE = 44;
 
-        // Başlık için yer ayırıyoruz (daha sonra doldurulacak)
+        // Ba�l�k i�in yer ay�r.
         for (int i = 0; i < HEADER_SIZE; i++)
             stream.WriteByte(0);
 
@@ -27,7 +27,6 @@ public static class WavUtility
         short[] intData = new short[samplesCount];
         byte[] bytesData = new byte[samplesCount * 2];
 
-        // Float değerleri 16-bit PCM formatına dönüştür
         for (int i = 0; i < samplesCount; i++)
         {
             intData[i] = (short)(Mathf.Clamp(samples[i], -1f, 1f) * 32767);
@@ -36,10 +35,9 @@ public static class WavUtility
             bytesData[i * 2 + 1] = b[1];
         }
 
-        // PCM verisini stream'e yaz
         stream.Write(bytesData, 0, bytesData.Length);
 
-        // WAV başlığını oluşturup stream'in başına yaz
+        // WAV ba�l���n� olu�turup stream'in ba��na yazar.
         WriteHeader(stream, clip);
 
         byte[] wavBytes = stream.ToArray();
@@ -47,47 +45,43 @@ public static class WavUtility
         return wavBytes;
     }
 
-    // WAV dosya başlığını yazar
+    // WAV dosya ba�l���n� yazar.
     static void WriteHeader(Stream stream, AudioClip clip)
     {
-        int hz = clip.frequency;     // Örnekleme frekansı
-        int channels = clip.channels; // Kanal sayısı
-        int samples = clip.samples;   // Toplam örnek sayısı
+        int hz = clip.frequency;
+        int channels = clip.channels;
+        int samples = clip.samples;
 
         stream.Seek(0, SeekOrigin.Begin);
 
-        // RIFF başlığı
         byte[] riff = System.Text.Encoding.UTF8.GetBytes("RIFF");
         stream.Write(riff, 0, 4);
 
-        int subChunk2 = samples * channels * 2; // Veri boyutu
+        int subChunk2 = samples * channels * 2;
         int chunkSize = 36 + subChunk2;
         stream.Write(BitConverter.GetBytes(chunkSize), 0, 4);
 
-        // WAVE format etiketi
         byte[] wave = System.Text.Encoding.UTF8.GetBytes("WAVE");
         stream.Write(wave, 0, 4);
 
-        // fmt alt bloğu
         byte[] fmt = System.Text.Encoding.UTF8.GetBytes("fmt ");
         stream.Write(fmt, 0, 4);
 
-        stream.Write(BitConverter.GetBytes(16), 0, 4);         // Subchunk1Size (PCM)
-        stream.Write(BitConverter.GetBytes((short)1), 0, 2);  // Audio format (PCM = 1)
-        stream.Write(BitConverter.GetBytes((short)channels), 0, 2); // Kanal sayısı
-        stream.Write(BitConverter.GetBytes(hz), 0, 4);         // Örnekleme frekansı
+        stream.Write(BitConverter.GetBytes(16), 0, 4);
+        stream.Write(BitConverter.GetBytes((short)1), 0, 2);
+        stream.Write(BitConverter.GetBytes((short)channels), 0, 2);
+        stream.Write(BitConverter.GetBytes(hz), 0, 4);
 
         int byteRate = hz * channels * 2;
-        stream.Write(BitConverter.GetBytes(byteRate), 0, 4);   // Byte rate
+        stream.Write(BitConverter.GetBytes(byteRate), 0, 4);
 
         short blockAlign = (short)(channels * 2);
-        stream.Write(BitConverter.GetBytes(blockAlign), 0, 2); // Block align
+        stream.Write(BitConverter.GetBytes(blockAlign), 0, 2);
         short bitsPerSample = 16;
-        stream.Write(BitConverter.GetBytes(bitsPerSample), 0, 2); // Bit/sample
+        stream.Write(BitConverter.GetBytes(bitsPerSample), 0, 2);
 
-        // data alt bloğu
         byte[] datastring = System.Text.Encoding.UTF8.GetBytes("data");
         stream.Write(datastring, 0, 4);
-        stream.Write(BitConverter.GetBytes(subChunk2), 0, 4); // Veri boyutu
+        stream.Write(BitConverter.GetBytes(subChunk2), 0, 4);
     }
 }

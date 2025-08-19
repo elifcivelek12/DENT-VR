@@ -1,45 +1,38 @@
 using UnityEngine;
 
-// Avatarın yürüme hareketlerini kontrol eden sınıf
+
 public class AvatarMoveControl : MonoBehaviour
 {
-    [Header("Bağlantılar")]
-    [Tooltip("Animasyonları kontrol edecek avatarın Animator bileşeni.")]
-    // Avatarın animasyonlarını yöneten Unity Animator bileşeni
+
+    [Header("Ba�lant�lar")]
+    [Tooltip("Animasyonlar� kontrol edilecek avatar�n Animator bile�eni.")]
     public Animator animator;
     
     void Start()
     {
-        // GameManager üzerinden "hasta girdi" olayı tetiklendiğinde
-        // BaslatYurume metodunu çalıştır
         GameManager.onPatientEntered += BaslatYurume;
+
     }
 
     void Update()
     {
-        // Eğer o an oynatılan animasyon "walk" ise, konsola bilgi yazdır
         if (animator.GetCurrentAnimatorStateInfo(0).IsName("walk"))
         {
-            Debug.Log("Yürüme animasyonu oynatılıyor");
+            Debug.Log("Yurume An�masyonu Oynat�l�yor");
+            
         }
     }
 
-    // Yürüme animasyonunu başlatır
     public void BaslatYurume()
     {
-        Debug.Log("StartWalk başladı");
-        // Animator’da "startwalk" tetikleyicisini çalıştır
+        Debug.Log("StartWalk ba�lad�");
         animator.SetTrigger("startwalk");
-
-        // 10 saniye sonra yürüme animasyonunu durdur
         Invoke("DurdurYurume", 10f);
     }
 
-    // Yürüme animasyonunu durdurur
     public void DurdurYurume()
     {
-        Debug.Log("Stopwalk başladı");
-        // Animator’da "stopwalk" tetikleyicisini çalıştır
+        Debug.Log("Stopwalk ba�lad�");
         animator.SetTrigger("stopwalk");
     }
 }

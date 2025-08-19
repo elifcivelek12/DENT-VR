@@ -218,9 +218,15 @@ public class ElevenLabsVoiceDemo : MonoBehaviour
 
             STTResponse sttData = JsonUtility.FromJson<STTResponse>(sttRequest.downloadHandler.text);
             string transcript = sttData.text;
-            Debug.Log($"📜 Çözümlenen Metin: {transcript}");
-
-            onTextTranscribed?.Invoke(transcript);
+            if (!string.IsNullOrWhiteSpace(transcript))
+            {
+                Debug.Log($"📜 Çözümlenen Metin: {transcript}");
+                onTextTranscribed?.Invoke(transcript); // Sadece dolu metin varsa Gemini'ye gönder
+            }
+            else
+            {
+                Debug.LogWarning("Sesten metne çevirme boş bir sonuç döndürdü. Muhtemelen sessizlik veya anlaşılamayan bir ses algılandı. Gemini'ye istek gönderilmedi.");
+                isAwaitingResponse = false;             }
         }
     }
     
