@@ -1,37 +1,44 @@
 using UnityEngine;
 
+// Butona basıldığında BoolHolder üzerinden görünürlük durumunu güncelleyen 
+// ve sahnedeki objelerin aktifliğini kontrol eden sınıf
 public class ButtonVisibilityTrigger : MonoBehaviour
 {
     [Header("Objeler")]
+    // Inspector üzerinden atanacak sahnedeki objeler
     public GameObject object1;
     public GameObject object2;
 
-    [Header("Bool Kayna��")]
+    [Header("Bool Kaynağı")]
+    // Bool değerini dışarıya taşıyan script
     public BoolHolder boolSource;
 
-    [Header("Buton ile G�nderilecek De�er")]
-    public bool valueToSend; // Inspector'dan ayarlanacak
+    [Header("Buton ile Gönderilecek Değer")]
+    // Inspector’dan ayarlanacak, butona basıldığında gönderilecek bool değeri
+    public bool valueToSend; 
 
-    // Butona atanacak fonksiyon
+    // Unity butonuna atanacak fonksiyon
     public void Trigger()
     {
+        // BoolHolder varsa, bool değerini güncelle
         if (boolSource != null)
         {
-            // Bool'u d��ar�dan se�ilen de�ere ayarla
+            // Bool'u dışarıdan seçilen değere ayarla
             boolSource.isVisible = valueToSend;
         }
 
-        // An�nda g�r�n�rl�k uygula
+        // Anında görünürlük uygula
         if (valueToSend)
         {
+            // object1 aktif, object2 pasif
             object1.SetActive(true);
             object2.SetActive(false);
         }
         else
         {
+            // object1 pasif, object2 aktif
             object1.SetActive(false);
             object2.SetActive(true);
         }
     }
 }
-
