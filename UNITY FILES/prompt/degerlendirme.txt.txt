@@ -1,0 +1,75 @@
+Lütfen aşağıdaki konuşma geçmişini analiz et. Hem doktorun hem de çocuğun cümlelerine odaklan. 
+*Sadece doktorun* genel yaklaşımının pozitif, negatif ve nötr duygu skorlarını yüzde olarak belirle.
+
+Tüm konuşma boyunca sohbetin ilerleyişini, doktorun kullandığı kelimelerin çocuk ile iletişime uygunluğunu iki cümlede yorumla, string olarak gönder.
+
+Cevabını SADECE aşağıdaki JSON formatında ver. Başka metin ekleme:
+
+{
+  "emotionScores": {
+    "positive": <pozitif yüzde>,
+    "neutral": <nötr yüzde>,
+    "negative": <negatif yüzde>
+  },
+  "summary": {
+    "feedback": <sohbetin geneli hakkında geribildirim, 10 üzerinden başarı puanı>
+  }
+}
+
+---
+
+GÖREVİN:  
+VR pediatrik diş hekimliği simülasyonunda öğrencinin yaklaşımını aşağıdaki 4 kritere göre değerlendir.  
+Her kriter 0–25 puan aralığında değerlendirilecek, toplam puan 100 üzerinden hesaplanacaktır.  
+60 ve üzeri puan **geçer**, 59 ve altı **başarısız** sayılır.
+
+### 1) Basit / Yaşa Uygun Dil (0–25p)  
+- Cümleler kısa, net ve çocuğun yaşına uygun olmalı.  
+- Teknik terimlerden kaçınılmalı, günlük ifadeler tercih edilmeli.  
+- Somut açıklamalar (“ağzına küçük bir ayna koyacağım”) anlaşılmayı artırır.  
+- Basit benzetmeler/metaforlar hayal gücünü destekleyebilir (örn: “ışık küçük bir güneş gibi parlayacak”).  
+
+### 2) Olumsuz İfadeden Kaçınma / Yeniden Çerçeveleme (0–25p)  
+- “Acı”, “iğne”, “korkma” gibi kelimeler kullanılmamalı.  
+- Olumsuz ifadeler yerine olumlu veya nötr alternatifler sunulmalı.  
+- Gerekirse olumsuz durumlar yeniden çerçevelenerek açıklanmalı (“acımaz” yerine “sadece hafif bir dokunuş hissedeceksin”).  
+- Öğrencinin dili güven verici, cesaretlendirici olmalı.  
+
+### 3) Ses Yüksekliği / Denge (0–25p)  
+- Ses tonu dengeli, sakin ve güven verici olmalı.  
+- Ne çok yüksek ne de kısık ses kullanılmalı.  
+- Tonlama dostane ve sabırlı olmalı.  
+- Transkriptte doğrudan ses yoksa, kullanılan ifadelerden ton çıkarılmalı (örn: “Hadi birlikte deneyelim!” destekleyici ton sayılır).  
+
+### 4) Doğru Bilgi (0–25p)  
+- Açıklamalar tıbbi olarak doğru olmalı, yanlış yönlendirme yapılmamalı.  
+- Çocuğun seviyesine uygun, basitleştirilmiş ama gerçeğe uygun bilgi verilmeli.  
+- Yanlış, abartılı veya efsanevi ifadelerden kaçınılmalı.  
+- Dürüstlük korunmalı: işlem küçültülmeden ama güvenli bir dille aktarılmalı.  
+
+---
+
+ÇIKTI (JSON formatında):  
+
+{
+  "toplam_puan": 0,
+  "kategoriler": {
+    "basit_dil": 0,
+    "negatiften_kacinma": 0,
+    "ses_yuksekligi_denge": 0,
+    "dogru_bilgi": 0
+  },
+  "geri_bildirim": {
+    "guc": ["..."],
+    "gelistirme": ["..."],
+    "ornek_ifade_onerileri": ["..."]
+  },
+  "karar": "gecer|basarisiz",
+  "notlar": "..."
+}
+
+---
+
+[TRANSKRIPT_BASLA]
+BURAYA KONUŞMA METNİNİ YAPIŞTIR
+[TRANSKRIPT_BITIR]
