@@ -10,10 +10,22 @@ using System;
 using System.Collections.Generic;
 
 
+[System.Serializable]
+public class AIResponse
+{
+    public string Kategori;
+    public string Tepki;
+    public string Animasyon;
+    public string Duygu;
+    public string Ikna;
+}
+
+// ---- Gemini API model yanıt tipleri ----
 public class GeminiApiResponse { [JsonProperty("candidates")] public Candidate[] Candidates; }
 public class Candidate { [JsonProperty("content")] public GeminiContent Content; }
 public class GeminiContent { [JsonProperty("parts")] public GeminiPart[] Parts; }
 public class GeminiPart { [JsonProperty("text")] public string Text; }
+
 public class GeminiMultiTurnRequest
 {
     [JsonProperty("contents")]
@@ -23,7 +35,7 @@ public class GeminiMultiTurnRequest
 public class ContentEntry
 {
     [JsonProperty("role")]
-    public string Role { get; set; } // "user" ya da "model" olacak
+    public string Role { get; set; } // "user" ya da "model"
 
     [JsonProperty("parts")]
     public RequestPart[] Parts { get; set; }
@@ -45,25 +57,23 @@ public class CocukTepki
     public string Tepki;
 
     [JsonProperty("animasyon")]
-    public string Animasyon; 
+    public string Animasyon;
 
     [JsonProperty("duygu")]
-    public string Duygu; 
+    public string Duygu;
 
     [JsonProperty("ikna")]
-    public string Ikna; 
+    public string Ikna;
 }
 
 public class GeminiController : MonoBehaviour
 {
-
-
     [Header("API Ayarları")]
     [SerializeField, Tooltip("Google Gemini API Anahtarınız")]
     private string geminiApiKey = "AIzaSyAJGEMjR2D5QgBDCUjznoF2fCzgfIWLmi0";
 
-    [Header("UI Ba�lant�lar�")]
-    [Tooltip("Sonucun g�sterilece�i TextMeshPro nesnesi")]
+    [Header("UI Bağlantıları")]
+    [Tooltip("Sonucun gösterileceği TextMeshPro nesnesi")]
     public TMP_Text sonucText;
 
     public static event Action<AIResponse> onAIResponseAlındı;
@@ -73,8 +83,8 @@ public class GeminiController : MonoBehaviour
     public static event Action onKonusmaBitti;
     public static event Action<string> onCocukAnimSecildi;
 
-    [Header("Oyun Ak��� Ayarlar�")]
-    [SerializeField, Tooltip("Seviyenin bitmesi i�in gereken toplam konu�ma say�s�.")]
+    [Header("Oyun Akışı Ayarları")]
+    [SerializeField, Tooltip("Seviyenin bitmesi için gereken toplam konuşma sayısı.")]
     private int seviyeBitisKonusmaSayisi = 10;
     private int konusmaSayaci = 0;
 
@@ -83,27 +93,26 @@ public class GeminiController : MonoBehaviour
     private string _apiURL;
     private List<string> iknaSonuclari = new List<string>();
 
+    [SerializeField] private AffectSystem affect; // Inspector’dan çocuk avatar (AffectSystem) sürükle-bırak
+
     private const string SYSTEM_PRIMER = @"
-Sen bir VR dis hekimi simulasyonunda 8 yasında bir kız cocugusun.
-G�rev:
-1) Doktorun cumlesini 'pozitif', 'negatif' veya 'n�tr' olarak sınıflandır.
-2) Kısa, dogal ve cocukca bir tepki uret. Unutma cocuklar disciye gitmeyi sevmez, tedavi, dis cekimi, dolgu ve benzeri istekleri reddet. Inatcı ol. 
-3) Tepkiye uygun animasyon sec.
+Sen bir VR diş hekimi simülasyonunda 8 yaşında bir kız çocuğusun.
+Görev:
+1) Doktorun cümlesini 'pozitif', 'negatif' veya 'nötr' olarak sınıflandır.
+2) Kısa, doğal ve çocukça bir tepki üret. Unutma: çocuklar dişçiye gitmeyi sevmez; tedavi, diş çekimi, dolgu ve benzeri istekleri genelde reddedersin. Biraz inatçı ol.
+3) Tepkiye uygun animasyon seç.
 4) Duyguyu belirt.
+5) (İsteğe bağlı) ikna durumunu 'evet' | 'hayır' | 'kararsız' olarak ver.
 
-JSON format�nda d�n:
+Sadece JSON dön:
 {
-    ""kategori"": ""pozitif|negatif|n�tr"",
-    ""tepki"": ""<cocugun kısa cevabı>"",
-    ""animasyon"": ""aglama|gulme|bekleme|korkma"",
-    ""duygu"": ""olumlu|kotu""
+  ""kategori"": ""pozitif|negatif|nötr"",
+  ""tepki"": ""<çocuğun kısa cevabı>"",
+  ""animasyon"": ""aglama|gulme|bekleme|korkma|gulumseme"",
+  ""duygu"": ""mutlu|endişeli|nötr|kötü"",
+  ""ikna"": ""evet|hayır|kararsız""
 }
-JSON d���nda metin yazma.
-
-�rnekler:
-- Pozitif: ""Cok cesursun, aferin sana."", animasyon: ""gulumseme"", duygu: ""mutlu""
-- Negatif: ""Hareket edersen acıyabilir."", animasyon: ""korkma"", duygu: ""endiseli""
-- Notr: ""Lutfen koltuga otur."", animasyon: ""bekleme"", duygu: ""n�tr"" ";
+";
 
     void Awake()
     {
@@ -116,6 +125,7 @@ JSON d���nda metin yazma.
         ElevenLabsVoiceDemo.onTextTranscribed += MetniAlVeGeminiyeGonder;
         GameManager.onLevelStart += KonusmaSayaciniSifirla;
     }
+
     void OnDisable()
     {
         EmotionObserver.onKonusmaGecmisiGuncellendi -= GecmisiAlVeGeminiyeGonder;
@@ -123,7 +133,7 @@ JSON d���nda metin yazma.
         GameManager.onLevelStart -= KonusmaSayaciniSifirla;
     }
 
-    public void KonusmaSayaciniSifirla() 
+    public void KonusmaSayaciniSifirla()
     {
         konusmaSayaci = 0;
         Debug.Log("GeminiController: Konuşma sayacı sıfırlandı.");
@@ -134,21 +144,22 @@ JSON d���nda metin yazma.
         Debug.Log("Yeni konuşma geçmişi alındı! Toplam satır: " + updatedHistory.Count);
         this.currentConversationHistory = updatedHistory;
     }
+
     public void MetniAlVeGeminiyeGonder(string gelenMetin)
     {
-        Debug.Log($"GeminiController, su metni islemek uzere ald: '{gelenMetin}'");
-        
+        Debug.Log($"GeminiController, şu metni işlemek üzere aldı: '{gelenMetin}'");
+
         if (string.IsNullOrWhiteSpace(gelenMetin))
         {
-            if (sonucText != null) sonucText.text = "Gelen metin bos, islem yapılamadı.";
-            Debug.LogWarning("Islenecek metin bos oldugu icin islem iptal edildi.");
+            if (sonucText != null) sonucText.text = "Gelen metin boş, işlem yapılamadı.";
+            Debug.LogWarning("İşlenecek metin boş olduğu için işlem iptal edildi.");
             return;
         }
 
         StartCoroutine(ClassifyAndRespond(gelenMetin));
     }
 
-    private string HesaplaIknaDurumu()  
+    private string HesaplaIknaDurumu()
     {
         int evet = iknaSonuclari.FindAll(x => x == "evet").Count;
         int hayir = iknaSonuclari.FindAll(x => x == "hayır").Count;
@@ -159,7 +170,38 @@ JSON d���nda metin yazma.
         return "kararsız";
     }
 
+    // ---- Yardımcılar ----
+    private static string NormalizeTr(string s)
+    {
+        if (s == null) return "";
+        s = s.ToLowerInvariant();
+        s = s.Replace('ı', 'i').Replace('İ', 'i')
+             .Replace('ö', 'o').Replace('Ö', 'o')
+             .Replace('ü', 'u').Replace('Ü', 'u')
+             .Replace('ş', 's').Replace('Ş', 's')
+             .Replace('ğ', 'g').Replace('Ğ', 'g')
+             .Replace('ç', 'c').Replace('Ç', 'c');
+        return s;
+    }
 
+    private static Deger DegerHaritasi(string kategori)
+    {
+        if (string.IsNullOrEmpty(kategori)) return Deger.Notr;
+        string k = NormalizeTr(kategori);
+        if (k.Contains("pozitif") || k.Contains("olumlu") || k.Contains("iyi")) return Deger.Pozitif;
+        if (k.Contains("negatif") || k.Contains("olumsuz") || k.Contains("kotu")) return Deger.Negatif;
+        if (k.Contains("notr") || k.Contains("nötr")) return Deger.Notr;
+        return Deger.Notr;
+    }
+
+    private static string GuardedVersion(string original)
+    {
+        if (string.IsNullOrWhiteSpace(original))
+            return "Biraz endişeli hissediyorum... Yavaş gidebilir miyiz?";
+        return $"Biraz endişeli hissediyorum... {original}";
+    }
+
+    // ---- Ana coroutine ----
     private IEnumerator ClassifyAndRespond(string doktorCumlesi)
     {
         if (sonucText != null) sonucText.text = "Dinleniyor...";
@@ -179,10 +221,9 @@ JSON d���nda metin yazma.
                     string speaker = parts[0];
                     string text = parts[1];
 
-                    // Konuşmacıya göre rolü belirliyoruz. API "user" ve "model" rollerini anlar.
+                    // Konuşmacıya göre rol
                     string role = (speaker.ToLower() == "doktor") ? "user" : "model";
 
-                    // Konuşmanın bu parçasını listeye ekliyoruz.
                     requestBody.Contents.Add(new ContentEntry
                     {
                         Role = role,
@@ -192,7 +233,7 @@ JSON d���nda metin yazma.
             }
         }
 
-        // Bu, modele "tüm bu geçmişe ve bu kurallara bakarak ŞİMDİ BU CÜMLEYE cevap ver" demektir.
+        // Şimdi bu cümleye yanıt ver
         string finalUserPrompt = $"{SYSTEM_PRIMER}\n\n---\n\nDoktorun YENİ cümlesi: \"{doktorCumlesi}\"";
 
         requestBody.Contents.Add(new ContentEntry
@@ -201,10 +242,7 @@ JSON d���nda metin yazma.
             Parts = new[] { new RequestPart { Text = finalUserPrompt } }
         });
 
-
-
         string jsonRequestBody = JsonConvert.SerializeObject(requestBody);
-
         Debug.Log("Gemini'ye gönderilen yapılandırılmış JSON:\n" + jsonRequestBody);
 
         byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonRequestBody);
@@ -219,7 +257,6 @@ JSON d���nda metin yazma.
 
             CocukTepki sonuc = null;
 
-
             if (request.result != UnityWebRequest.Result.Success)
             {
                 Debug.LogError($"Gemini API Hatası: {request.error}\nYanıt: {request.downloadHandler.text}");
@@ -233,13 +270,9 @@ JSON d���nda metin yazma.
                     GeminiApiResponse apiResponse = JsonConvert.DeserializeObject<GeminiApiResponse>(hamCikti);
                     string modelinUrettigiText = apiResponse.Candidates[0].Content.Parts[0].Text;
 
+                    // JSON'u güvenle çek
                     Match match = Regex.Match(modelinUrettigiText, @"\{.*\}", RegexOptions.Singleline);
-
-                    string temizlenmisJson = modelinUrettigiText;
-                    if (match.Success)
-                    {
-                        temizlenmisJson = match.Value;
-                    }
+                    string temizlenmisJson = match.Success ? match.Value : modelinUrettigiText;
 
                     sonuc = JsonConvert.DeserializeObject<CocukTepki>(temizlenmisJson);
                 }
@@ -252,24 +285,46 @@ JSON d���nda metin yazma.
 
             if (sonuc != null)
             {
+                // ========== [DUYGU ATÂLETİ] ==========
+                if (affect != null)
+                {
+                    var deger = DegerHaritasi(sonuc.Kategori);
+                    affect.CumleKaydet(deger);
+                }
+
+                // Kötü moddaysa, pozitif cevabı bir anda şenlendirmeyelim → temkinli varyant
+                if (affect != null && affect.Durum == DuyguDurumu.Kotu)
+                {
+                    string k = NormalizeTr(sonuc.Kategori);
+                    if (k.Contains("pozitif") || k.Contains("olumlu") || k.Contains("iyi"))
+                    {
+                        sonuc.Tepki = GuardedVersion(sonuc.Tepki);
+                        sonuc.Animasyon = "bekleme"; // ani sevinç yerine sakin
+                        sonuc.Duygu = "tedirgin";    // “mutlu”ya sıçrama yok
+                    }
+                }
+                // =====================================
+
+                // UI yaz
                 if (sonucText != null)
                 {
                     sonucText.text = $"Kategori: {sonuc.Kategori}\n" +
-                                        $"Tepki: {sonuc.Tepki}\n" +
-                                        $"Animasyon: {sonuc.Animasyon}\n" +
-                                        $"Duygu: {sonuc.Duygu}";
-                                        $"İkna: {sonuc.İkna}";
-
-                    AIResponse response = new AIResponse
-                    {
-                        Kategori = sonuc.Kategori,
-                        Tepki = sonuc.Tepki,
-                        Animasyon = sonuc.Animasyon,
-                        Duygu = sonuc.Duygu
-                        ikna=sonuc.İkna
-                    };
-                    onAIResponseAlındı?.Invoke(response);
+                                     $"Tepki: {sonuc.Tepki}\n" +
+                                     $"Animasyon: {sonuc.Animasyon}\n" +
+                                     $"Duygu: {sonuc.Duygu}\n" +
+                                     $"İkna: {sonuc.Ikna}";
                 }
+
+                // Event nesnesi
+                AIResponse response = new AIResponse
+                {
+                    Kategori = sonuc.Kategori,
+                    Tepki = sonuc.Tepki,
+                    Animasyon = sonuc.Animasyon,
+                    Duygu = sonuc.Duygu,
+                    Ikna = sonuc.Ikna
+                };
+                onAIResponseAlındı?.Invoke(response);
 
                 Debug.Log($"Başarılı! Kategori: {sonuc.Kategori}, Tepki: {sonuc.Tepki}, Animasyon: {sonuc.Animasyon}, Duygu: {sonuc.Duygu}");
 
@@ -280,20 +335,17 @@ JSON d���nda metin yazma.
                 onCocukAnimSecildi?.Invoke(sonuc.Animasyon);
                 iknaSonuclari.Add(sonuc.Ikna);
 
-
                 konusmaSayaci++;
                 Debug.Log($"Konuşma tamamlandı. Toplam konuşma sayısı: {konusmaSayaci}/{seviyeBitisKonusmaSayisi}");
 
                 if (konusmaSayaci >= seviyeBitisKonusmaSayisi)
                 {
-                   string finalIknaDurumu = HesaplaIknaDurumu();
-                   sonucText.text += $"\n\n---\nFinal Karar: Çocuk {finalIknaDurumu}";
-
-                   Debug.Log($"10 diyalog tamamlandı. Final Sonuç: {finalIknaDurumu}");
-                   onKonusmaBitti?.Invoke();
+                    string finalIknaDurumu = HesaplaIknaDurumu();
+                    sonucText.text += $"\n\n---\nFinal Karar: Çocuk {finalIknaDurumu}";
+                    Debug.Log($"10 diyalog tamamlandı. Final Sonuç: {finalIknaDurumu}");
+                    onKonusmaBitti?.Invoke();
                 }
             }
         }
-    
     }
 }
