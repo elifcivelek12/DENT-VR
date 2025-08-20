@@ -1,41 +1,66 @@
+// AvatarMoodController.cs (DOĞRU VE EN GÜNCEL HALİ)
 using UnityEngine;
 
+[RequireComponent(typeof(Animator))]
+[RequireComponent(typeof(AffectSystem))]
 public class AvatarMoodController : MonoBehaviour
 {
-    [Header("Fabrika Bağlantısı")]
+    [Header("Kişilik Yapılandırması")]
+    [Tooltip("Kişilik profillerini barındıran fabrika.")]
     public PersonalityFactory factory;
-
-    [Header("Yapılandırma")]
+    [Tooltip("Bu avatar için kullanılacak kişilik tipi.")]
     public PersonalityType personality;
 
     [Header("Bağlantılar")]
     [Tooltip("Animasyonları kontrol edilecek avatarın Animator bileşeni.")]
     public Animator avatarAnimator;
 
-    private IMoodStrategy currentStrategy;
-    private IMoodAnimationFactory currentAnimationFactory; // Mevcut ruh hali animasyon fabrikamız
+    [Tooltip("Avatarın duygu durumunu yöneten sistem.")]
+    public AffectSystem affectSystem;
 
-    void Start()
+    void Awake()
     {
-        if (avatarAnimator == null)
+        // Gerekli bileşenleri otomatik olarak almayı dene.
+        if (avatarAnimator == null) avatarAnimator = GetComponent<Animator>();
+        if (affectSystem == null) affectSystem = GetComponent<AffectSystem>();
+
+        // Kişilik Profili Yüklemesi
+        ConfigureAffectSystem();
+    }
+
+    /// <summary>
+    /// PersonalityFactory'den doğru profili alır ve ayarlarını AffectSystem'e uygular.
+    /// </summary>
+    void ConfigureAffectSystem()
+    {
+        if (factory == null)
         {
-            Debug.LogError("Avatar Animator referansı atanmamış! Lütfen Inspector'dan atayın.", this.gameObject);
+            Debug.LogError("PersonalityFactory atanmamış! Kişilik yüklenemedi.", this.gameObject);
+            return;
         }
 
         PersonalityProfile profile = factory.GetProfile(personality);
         if (profile == null)
         {
-            Debug.LogError($"'{personality}' için profil bulunamadı! Lütfen fabrikayı kontrol edin.");
+            Debug.LogError($"'{personality}' için profil bulunamadı! Varsayılan ayarlar kullanılacak.", this.gameObject);
             return;
         }
 
-        // Başlangıçta Nötr ruh hali fabrikasını ayarla. Bu, null hatası almayı önler.
-        currentAnimationFactory = new NotrMoodAnimationFactory();
-        Debug.Log("[AvatarMoodController] Başlangıç animasyon fabrikası 'NotrMoodAnimationFactory' olarak ayarlandı.");
+        Debug.Log($"<color=yellow>Kişilik profili yükleniyor: {profile.name}</color>");
 
-        currentStrategy = new StreakBasedStrategy();
-        currentStrategy.SetProfile(profile);
-        currentStrategy.OnMoodShouldChange += HandleMoodChange; // Ruh hali değişince fabrikayı da değiştir
+        // Profilden okunan değerleri AffectSystem'e ata
+        affectSystem.yariOmur = profile.yariOmur;
+        affectSystem.sinir = profile.sinir;
+        affectSystem.pozitifEtki = profile.pozitifEtki;
+        affectSystem.negatifEtki = profile.negatifEtki;
+        affectSystem.pozitifAzaltmaEgrisi = profile.pozitifAzaltmaEgrisi;
+        affectSystem.beklemeSuresi = profile.beklemeSuresi;
+        affectSystem.kotuGiris = profile.kotuGiris;
+        affectSystem.kotuCikis = profile.kotuCikis;
+        affectSystem.iyiGiris = profile.iyiGiris;
+        affectSystem.iyiCikis = profile.iyiCikis;
+        affectSystem.girisSuresi = profile.girisSuresi;
+        affectSystem.cikisSuresi = profile.cikisSuresi;
     }
 
     void OnEnable()
@@ -46,93 +71,53 @@ public class AvatarMoodController : MonoBehaviour
     void OnDisable()
     {
         GeminiController.onAIResponseAlındı -= HandleAIResponse;
-        if (currentStrategy != null)
-        {
-            currentStrategy.OnMoodShouldChange -= HandleMoodChange;
-        }
     }
 
     void HandleAIResponse(AIResponse response)
     {
-        Debug.Log($"[GÖZLEMCİ] Anons alındı -> Duygu: '{response.Duygu}', Tepki: '{response.Animasyon}'.");
-
-        // Gelen genel animasyon talebini, mevcut ruh haline göre fabrikadan alıp tetikle
         TriggerInstantReaction(response.Animasyon);
-
-        string category = TranslateDuyguToCategory(response.Duygu);
-        if (!string.IsNullOrEmpty(category))
-        {
-            currentStrategy?.ProcessCategory(category);
-        }
     }
 
-    // Bu metot artık doğrudan trigger isimlerini bilmiyor, fabrikadan istiyor.
     void TriggerInstantReaction(string animasyonTipi)
     {
-        if (avatarAnimator == null || animasyonTipi == "yok" || string.IsNullOrEmpty(animasyonTipi))
+        if (affectSystem == null || avatarAnimator == null || animasyonTipi == "yok" || string.IsNullOrEmpty(animasyonTipi))
         {
             return;
         }
 
-        IAnimationBehaviour animationBehaviour = null;
+        IMoodAnimationFactory currentAnimationFactory;
+        DuyguDurumu mevcutDurum = affectSystem.Durum;
 
+        switch (mevcutDurum)
+        {
+            case DuyguDurumu.Iyi:
+                currentAnimationFactory = new IyiMoodAnimationFactory();
+                break;
+            case DuyguDurumu.Kotu:
+                currentAnimationFactory = new KotuMoodAnimationFactory();
+                break;
+            default: // DuyguDurumu.Notr
+                currentAnimationFactory = new NotrMoodAnimationFactory();
+                break;
+        }
+
+        IAnimationBehaviour animationBehaviour = null;
         switch (animasyonTipi.ToLower())
         {
             case "aglama":
                 animationBehaviour = currentAnimationFactory.CreateAglamaAnimation();
                 break;
-
             case "gulme":
                 animationBehaviour = currentAnimationFactory.CreateGulmeAnimation();
                 break;
-
             case "korkma":
                 animationBehaviour = currentAnimationFactory.CreateKorkmaAnimation();
                 break;
-
             default:
-                Debug.LogWarning($"[AvatarMoodController] Tanımlanmamış animasyon tipi geldi: '{animasyonTipi}'.");
+                Debug.LogWarning($"[AvatarMoodController] Tanımlanmamış animasyon tipi: '{animasyonTipi}'.");
                 break;
         }
 
-        // Fabrikadan gelen animasyon davranışını oynat (null değilse).
         animationBehaviour?.Play(avatarAnimator);
-    }
-
-    private string TranslateDuyguToCategory(string duygu)
-    {
-        switch (duygu.ToLower())
-        {
-            case "mutlu":
-            case "sevinçli":
-                return "olumlu";
-            case "uzgun":
-            case "kızgın":
-                return "kotu";
-            default:
-                return null;
-        }
-    }
-
-    // RUH HALİ DEĞİŞTİĞİNDE DOĞRU FABRİKAYI SEÇEN EN ÖNEMLİ METOT
-    void HandleMoodChange(string newMood)
-    {
-        Debug.LogWarning($"!!!!!!!! AVATAR RUH HALİ DEĞİŞTİ -> {newMood} !!!!!!!");
-
-        switch (newMood.ToUpper())
-        {
-            case "İYİ":
-                currentAnimationFactory = new IyiMoodAnimationFactory();
-                Debug.LogWarning("[AvatarMoodController] Animasyon fabrikası 'IyiMoodAnimationFactory' olarak değiştirildi.");
-                break;
-            case "KÖTÜ":
-                currentAnimationFactory = new KotuMoodAnimationFactory();
-                Debug.LogWarning("[AvatarMoodController] Animasyon fabrikası 'KotuMoodAnimationFactory' olarak değiştirildi.");
-                break;
-            default: // Nötr veya tanımsız bir durum için güvenli varsayılan.
-                currentAnimationFactory = new NotrMoodAnimationFactory();
-                Debug.LogWarning("[AvatarMoodController] Animasyon fabrikası 'NotrMoodAnimationFactory' olarak değiştirildi.");
-                break;
-        }
     }
 }

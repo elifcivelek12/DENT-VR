@@ -5,9 +5,8 @@ using System.Linq;
 
 public enum PersonalityType
 {
-    Sakin,
-    Tripli,
-    Notr
+    Melissa,
+    Lara,
 }
 
 public class PersonalityFactory : MonoBehaviour

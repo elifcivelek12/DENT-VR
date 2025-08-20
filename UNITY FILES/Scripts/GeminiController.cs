@@ -56,7 +56,8 @@ public class CocukTepki
 
 public class GeminiController : MonoBehaviour
 {
-
+    [Header("Duygu Sistemi Bağlantısı")]
+    public AffectSystem affectSystem;
 
     [Header("API Ayarları")]
     [SerializeField, Tooltip("Google Gemini API Anahtarınız")]
@@ -68,14 +69,12 @@ public class GeminiController : MonoBehaviour
 
     public static event Action<AIResponse> onAIResponseAlındı;
     public static event Action<string, string> onKonusmaGecmisiEklendi;
-    public static event Action<string> onCocukTepkisiUretildi;
-    public static event Action<string> onDuyguBelirlendi;
-    public static event Action onKonusmaBitti;
-    public static event Action<string> onCocukAnimSecildi;
+    public static event Action<string> onCocukTepkisiUretildi; 
+    public static event Action onKonusmaBitti;    
 
     [Header("Oyun Ak��� Ayarlar�")]
     [SerializeField, Tooltip("Seviyenin bitmesi i�in gereken toplam konu�ma say�s�.")]
-    private int seviyeBitisKonusmaSayisi = 10;
+    private int seviyeBitisKonusmaSayisi = 5;
     private int konusmaSayaci = 0;
 
     private List<string> currentConversationHistory;
@@ -122,6 +121,9 @@ public class GeminiController : MonoBehaviour
     public void KonusmaSayaciniSifirla() 
     {
         konusmaSayaci = 0;
+        currentConversationHistory.Clear(); 
+        iknaSonuclari.Clear();
+
         Debug.Log("GeminiController: Konuşma sayacı sıfırlandı.");
     }
 
@@ -266,15 +268,25 @@ public class GeminiController : MonoBehaviour
                         Ikna =sonuc.Ikna,
                     };
                     onAIResponseAlındı?.Invoke(response);
+
+                    if (affectSystem != null)
+                    {
+                        Deger gelenDeger = Deger.Notr;
+                        switch (sonuc.Kategori.ToLower())
+                        {
+                            case "pozitif": gelenDeger = Deger.Pozitif; break;
+                            case "negatif": gelenDeger = Deger.Negatif; break;
+                        }
+                        affectSystem.CumleKaydet(gelenDeger);
+                        Debug.Log($"<color=cyan>[GeminiController] AffectSystem'e bildirildi: {gelenDeger}</color>");
+                    }
                 }
 
                 Debug.Log($"Başarılı! Kategori: {sonuc.Kategori}, Tepki: {sonuc.Tepki}, Animasyon: {sonuc.Animasyon}, Duygu: {sonuc.Duygu}");
 
                 onCocukTepkisiUretildi?.Invoke(sonuc.Tepki);
-                onDuyguBelirlendi?.Invoke(sonuc.Duygu);
                 onKonusmaGecmisiEklendi?.Invoke(doktorCumlesi, "Doktor");
                 onKonusmaGecmisiEklendi?.Invoke(sonuc.Tepki, "Çocuk");
-                onCocukAnimSecildi?.Invoke(sonuc.Animasyon);
                 iknaSonuclari.Add(sonuc.Ikna);
 
 
