@@ -5,7 +5,7 @@ MonoImporter:
   serializedVersion: 2
   defaultReferences:
   - audioSource: {instanceID: 0}
-  - startRecordingAction: {fileID: 5667446173830999989, guid: 0be0028c24f2a4c14a96b6aa39055933, type: 3}
+  - startRecordingAction: {instanceID: 0}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 

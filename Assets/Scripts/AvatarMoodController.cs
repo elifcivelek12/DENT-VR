@@ -103,10 +103,10 @@ public class AvatarMoodController : MonoBehaviour
         IAnimationBehaviour animationBehaviour = null;
         switch (animasyonTipi.ToLower())
         {
-            case "aglama":
+            case "ağlama":
                 animationBehaviour = currentAnimationFactory.CreateAglamaAnimation();
                 break;
-            case "gulme":
+            case "gülme":
                 animationBehaviour = currentAnimationFactory.CreateGulmeAnimation();
                 break;
             case "korkma":

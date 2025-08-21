@@ -2,23 +2,28 @@ using UnityEngine;
 using TMPro;
 using System;
 
-
 public enum GameState { BeforeStart, Playing, GameOver }
+
 public class GameManager : MonoBehaviour
 {
-
     public static GameState currentState;
 
     [Header("UI Bağlantıları")]
     [Tooltip("Konuşmayı başlatacak olan buton.")]
     public GameObject startButton;
-    public GameObject ResultPanel;
-    public GameObject FeedbackPanel;
+
+    public GameObject SonucPanel;
+    public GameObject ResultPanel;    // Kart-1 (özet/puan/süre)
+    public GameObject FeedbackPanel;  // Kart-2 (uzun feedback)
+    public GameObject SentencePanel;  // Kart-3 (en pozitif/en negatif)
+
     [Tooltip("Oyun sonuçlarının gösterileceği TextMeshPro nesnesi.")]
-    public TMP_Text resultText;
-    public TMP_Text feedbackText;
+    public TMP_Text resultText;       // Kart-1 metinleri
+    public TMP_Text feedbackText;     // Kart-2 metni
 
-
+    [Header("Kart 3: En Pozitif / En Negatif")]
+    public TMP_Text bestSentenceText;   // Kart-3 pozitif
+    public TMP_Text worstSentenceText;  // Kart-3 negatif
 
     public static event Action onLevelStart;
     public static event Action onLevelEnd;
@@ -29,81 +34,102 @@ public class GameManager : MonoBehaviour
     void Start()
     {
         currentState = GameState.BeforeStart;
+
+        // Başlangıç UI durumu
         if (startButton != null) startButton.SetActive(true);
-        if (resultText != null) resultText.text = "Lütfen seansı baslatmak icin butona basın.";
+        if (SonucPanel != null) SonucPanel.SetActive(false);
+        //if (ResultPanel != null) ResultPanel.SetActive(false);
+        //if (FeedbackPanel != null) FeedbackPanel.SetActive(false);
+        //if (SentencePanel != null) SentencePanel.SetActive(false);
+
+        if (resultText != null)
+            resultText.text = "Lütfen seansı başlatmak için butona basın.";
     }
 
     void OnEnable()
     {
-        // Eski GeminiController ve EmotionObserver referansları kaldırıldı,
-        // çünkü her ikisi de GeminiManager içinde birleştirildi.
-        GeminiManager.onKonusmaBitti += EndLevel;
-        GeminiManager.onAnalizTamamlandı += DisplayFinalResults;
+        // Sıra: 1) onAnalizTamamlandı (puan/süre & uzun feedback) -> 2) onFinalHazir (en iyi/kötü cümleler) -> 3) onKonusmaBitti (panel aç)
+        GeminiManager.onAnalizTamamlandı += DisplayFinalResults; // Kart-1 & Kart-2
+        GeminiManager.onFinalHazir += HandleFinalPackage;  // Kart-3
+        GeminiManager.onKonusmaBitti += EndLevel;            // Panellerin görünürlüğünü finalize et
     }
 
     void OnDisable()
     {
-        GeminiManager.onKonusmaBitti -= EndLevel;
         GeminiManager.onAnalizTamamlandı -= DisplayFinalResults;
+        GeminiManager.onFinalHazir -= HandleFinalPackage;
+        GeminiManager.onKonusmaBitti -= EndLevel;
     }
 
     public void StartLevel()
     {
-        if (currentState != GameState.Playing)
-        {
-            Debug.Log("[GameManager] Seviye Başlatılıyor. GameState Playing olarak değiştiriliyor ");
-            currentState = GameState.Playing;
-            startTime = Time.time;
+        if (currentState == GameState.Playing) return;
 
-            if (startButton != null) startButton.SetActive(false);
-            if (resultText != null) ResultPanel.SetActive(false);
-            if (resultText != null) resultText.text = "Seans devam ediyor...";
+        Debug.Log("[GameManager] Seviye başlatılıyor…");
+        currentState = GameState.Playing;
+        startTime = Time.time;
 
-            onLevelStart?.Invoke();
-            onPatientEntered?.Invoke();
-        }
+        // Seans başlarken tüm sonuç panellerini kapat
+        if (startButton != null) startButton.SetActive(false);
+        if (SonucPanel != null) SonucPanel.SetActive(false);
+        //if (ResultPanel != null) ResultPanel.SetActive(false);
+        //if (FeedbackPanel != null) FeedbackPanel.SetActive(false);
+        //if (SentencePanel != null) SentencePanel.SetActive(false);
+
+        if (resultText != null)
+            resultText.text = "Seans devam ediyor…";
+
+        onLevelStart?.Invoke();
+        onPatientEntered?.Invoke();
     }
 
     public void EndLevel()
     {
-        if (currentState == GameState.Playing)
-        {
-            currentState = GameState.GameOver;
-            Debug.Log("[GameManager] Seviye Bitti. Analiz sonuçları bekleniyor...Game State GameOver olarak değiştirildi");
-            if (resultText != null) ResultPanel.SetActive(true);
-            if (resultText != null) resultText.text = "Seans bitti. Analiz sonuçları hazırlanıyor...";
-            onLevelEnd?.Invoke();
-        }
+        if (currentState != GameState.Playing) return;
+
+        currentState = GameState.GameOver;
+        Debug.Log("[GameManager] Seviye bitti. Son paneller gösteriliyor…");
+
+        if (SonucPanel != null) SonucPanel.SetActive(true);
+
+        onLevelEnd?.Invoke();
     }
 
+    // --- Kart-3: En pozitif / En negatif cümleler ---
+    private void HandleFinalPackage(GeminiManager.FinalResultData data)
+    {
+        if (SonucPanel != null) SonucPanel.SetActive(true);
+
+        if (bestSentenceText != null)
+            bestSentenceText.text = string.IsNullOrWhiteSpace(data.EnPozitifCumle) ? "—" : data.EnPozitifCumle;
+
+        if (worstSentenceText != null)
+            worstSentenceText.text = string.IsNullOrWhiteSpace(data.EnNegatifCumle) ? "—" : data.EnNegatifCumle;
+    }
+
+    // --- Kart-1 & Kart-2: Puanlar/süre ve uzun feedback ---
     private void DisplayFinalResults(AnalysisResult result)
     {
         float duration = Time.time - startTime;
         Debug.Log("[GameManager] Analiz sonuçları alındı ve gösteriliyor.");
 
-        // Sonuçları gösterecek panelleri aktif et
-        if (ResultPanel != null) ResultPanel.SetActive(true);
-        if (FeedbackPanel != null) FeedbackPanel.SetActive(true);
+        if (SonucPanel != null) SonucPanel.SetActive(true);
+        //if (ResultPanel != null) ResultPanel.SetActive(true);
+        //if (FeedbackPanel != null) FeedbackPanel.SetActive(true);
 
-        // Skor ve süre bilgilerini 'resultText'e yazdır
         if (resultText != null)
         {
             string resultReport =
-                $"SEANS TAMAMLANDI\n" +
+                "SEANS TAMAMLANDI\n" +
                 $"Süre: {duration:F1} saniye\n\n" +
-                $"<b>DOKTOR DEĞERLENDİRMESİ</b>\n" +
+                "<b>DOKTOR DEĞERLENDİRMESİ</b>\n" +
                 $"Pozitif: <color=green>%{result.PositiveScore:F0}</color>\n" +
                 $"Nötr: <color=grey>%{result.NeutralScore:F0}</color>\n" +
                 $"Negatif: <color=red>%{result.NegativeScore:F0}</color>";
-
             resultText.text = resultReport;
         }
 
-        // Geri bildirim (özet) metnini 'feedbackText'e yazdır
         if (feedbackText != null)
-        {
-            string feedbackReport = $"<b>Özet:</b>\n<i>{result.feedback}</i>";
-            feedbackText.text = feedbackReport;
-        }
+            feedbackText.text = $"<b>Özet:</b>\n<i>{result.feedback}</i>";
     }
 }

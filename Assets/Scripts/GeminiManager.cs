@@ -1,4 +1,4 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using UnityEngine.Networking;
 using System.Collections;
 using System.Collections.Generic;
@@ -7,9 +7,8 @@ using System;
 using TMPro;
 using Newtonsoft.Json;
 using System.Text.RegularExpressions;
-using UnityEngine.Events;
+using System.Linq;
 
-// JSON ve dahili veri yapýlarý
 [System.Serializable]
 public class GeminiAIResponse
 {
@@ -38,7 +37,6 @@ public class ContentEntry
 
 public class RequestPart { [JsonProperty("text")] public string Text { get; set; } }
 
-// Duygu analizi için özel JSON yapýlarý
 public class GeminiApiResponseObserverFinal { [JsonProperty("candidates")] public CandidateObserverFinal[] Candidates; }
 public class CandidateObserverFinal { [JsonProperty("content")] public GeminiRequestContentObserver Content; }
 public class GeminiRequestContentObserver { [JsonProperty("parts")] public GeminiRequestPartObserver[] Parts; }
@@ -46,6 +44,14 @@ public class GeminiRequestPartObserver { [JsonProperty("text")] public string Te
 [System.Serializable] public class EmotionScores { [JsonProperty("negative")] public float Negative; [JsonProperty("neutral")] public float Neutral; [JsonProperty("positive")] public float Positive; }
 public class Summary { [JsonProperty("feedback")] public string feedback; }
 [System.Serializable] public class GeminiEmotionResponse { [JsonProperty("emotionScores")] public EmotionScores EmotionScores; [JsonProperty("summary")] public Summary Summary; }
+
+
+[System.Serializable]
+public class SpeakerExtremes
+{
+    [JsonProperty("positive")] public string Positive;
+    [JsonProperty("negative")] public string Negative;
+}
 
 public struct AnalysisResult
 {
@@ -57,56 +63,79 @@ public struct AnalysisResult
 
 public class GeminiManager : MonoBehaviour
 {
-    [Header("Duygu Sistemi Baðlantýsý")]
+
+    public struct FinalResultData
+    {
+        public string IknaDurumu;
+        public int ToplamKonusma;
+        public string EnPozitifCumle;
+        public string EnNegatifCumle;
+        public string UzunFeedback;
+    }
+
+    public static event Action<FinalResultData> onFinalHazir;
+
+    [Header("Duygu Sistemi BaÄŸlantÄ±sÄ±")]
     public AffectSystem affectSystem;
 
-    [Header("API Ayarlarý")]
-    [SerializeField, Tooltip("Google Gemini API Anahtarýnýz")]
-    private string geminiApiKey = "AIzaSyAJGEMjR2D5QgBDCUjznoF2fCzgfIWLmi0";
+    [Header("API AyarlarÄ±")]
+    [SerializeField, Tooltip("Google Gemini API AnahtarÄ±nÄ±z")]
+    private string geminiApiKey = "YOUR_GEMINI_API_KEY";
 
-    
+    [Header("UI")]
     public TMP_Text sonucText;
 
-    [Header("Oyun Akýþý Ayarlarý")]
-    [SerializeField, Tooltip("Seviyenin bitmesi için gereken toplam konuþma sayýsý.")]
+    [Header("Oyun AkÄ±ÅŸÄ± AyarlarÄ±")]
+    [SerializeField, Tooltip("Seviyenin bitmesi iÃ§in gereken toplam konuÅŸma sayÄ±sÄ±.")]
     private int seviyeBitisKonusmaSayisi = 5;
 
-    // Özel Olaylar (Diðer script'ler bu olaylara abone olabilir)
-    public static event Action<AIResponse> onAIResponseAlýndý;
+    // Olaylar
+    public static event Action<AIResponse> onAIResponseAlÄ±ndÄ±;
     public static event Action<string> onCocukTepkisiUretildi;
     public static event Action onKonusmaBitti;
-    public static event Action<AnalysisResult> onAnalizTamamlandý;
+    public static event Action<AnalysisResult> onAnalizTamamlandÄ±;
 
-    // Özel deðiþkenler
+    // Ä°Ã§ durum
     private int konusmaSayaci = 0;
     private List<string> currentConversationHistory;
     private List<string> iknaSonuclari;
+
     private const string MODEL_NAME = "gemini-1.5-flash";
     private string _apiURL;
     private string systemPrimer;
     private string analysisPrompt;
 
+
+    [Header("Ekstrakt AyarÄ±")]
+    [SerializeField] private string hedefKonusmaciEtiketi = "Doktor";
+
+
+    private string _finalFeedback = "";
+    private string _speakerEnPozitif = "";
+    private string _speakerEnNegatif = "";
+
+
     void Awake()
     {
         _apiURL = $"https://generativelanguage.googleapis.com/v1beta/models/{MODEL_NAME}:generateContent?key={geminiApiKey}";
 
-        // Prompt dosyalarýný yükleme
+
         string primerPath = "prompts/tripliprompt";
         TextAsset primerAsset = Resources.Load<TextAsset>(primerPath);
-        if (primerAsset == null) Debug.LogError($"Prompt dosyasý bulunamadý: Assets/Resources/{primerPath}");
+        if (primerAsset == null) Debug.LogError($"Prompt dosyasÄ± bulunamadÄ±: Assets/Resources/{primerPath}");
         systemPrimer = (primerAsset != null) ? primerAsset.text : "";
 
         string analysisPath = "prompts/degerlendirme";
         TextAsset analysisAsset = Resources.Load<TextAsset>(analysisPath);
-        if (analysisAsset == null) Debug.LogError($"Prompt dosyasý bulunamadý: Assets/Resources/{analysisPath}");
+        if (analysisAsset == null) Debug.LogError($"Prompt dosyasÄ± bulunamadÄ±: Assets/Resources/{analysisPath}");
         analysisPrompt = (analysisAsset != null) ? analysisAsset.text : "";
 
-        Debug.Log("Promptlar baþarýyla yüklendi.");
+        Debug.Log("Promptlar baÅŸarÄ±yla yÃ¼klendi.");
     }
 
     void Start()
     {
-        if (string.IsNullOrEmpty(geminiApiKey)) Debug.LogError("Gemini API Anahtarý eksik!");
+        if (string.IsNullOrEmpty(geminiApiKey)) Debug.LogError("Gemini API AnahtarÄ± eksik!");
         konusmaSayaci = 0;
         currentConversationHistory = new List<string>();
         iknaSonuclari = new List<string>();
@@ -124,6 +153,7 @@ public class GeminiManager : MonoBehaviour
         GameManager.onLevelStart -= KonusmaSayaciniSifirla;
     }
 
+
     public void KonusmaSayaciniSifirla()
     {
         konusmaSayaci = 0;
@@ -132,15 +162,20 @@ public class GeminiManager : MonoBehaviour
 
         currentConversationHistory.Clear();
         iknaSonuclari.Clear();
-        Debug.Log("Gemini Manager: Konuþma sayacý sýfýrlandý.");
+
+        _finalFeedback = "";
+        _speakerEnPozitif = "";
+        _speakerEnNegatif = "";
+
+        Debug.Log("Gemini Manager: KonuÅŸma sayacÄ± sÄ±fÄ±rlandÄ±.");
     }
 
     public void HandleVoiceInput(string gelenMetin)
     {
         if (string.IsNullOrWhiteSpace(gelenMetin))
         {
-            if (sonucText != null) sonucText.text = "Gelen metin boþ, iþlem yapýlamadý.";
-            Debug.LogWarning("Ýþlenecek metin boþ olduðu için iþlem iptal edildi.");
+            if (sonucText != null) sonucText.text = "Gelen metin boÅŸ, iÅŸlem yapÄ±lamadÄ±.";
+            Debug.LogWarning("Ä°ÅŸlenecek metin boÅŸ olduÄŸu iÃ§in iÅŸlem iptal edildi.");
             return;
         }
 
@@ -153,15 +188,22 @@ public class GeminiManager : MonoBehaviour
         yield return StartCoroutine(ClassifyAndRespond(doktorCumlesi));
 
         konusmaSayaci++;
-        Debug.Log($"Konuþma tamamlandý. Toplam konuþma sayýsý: {konusmaSayaci}/{seviyeBitisKonusmaSayisi}");
+        Debug.Log($"KonuÅŸma tamamlandÄ±. Toplam konuÅŸma sayÄ±sÄ±: {konusmaSayaci}/{seviyeBitisKonusmaSayisi}");
 
         if (konusmaSayaci >= seviyeBitisKonusmaSayisi)
         {
-            Debug.LogWarning("[GeminiManager] KONUÞMA BÝTTÝ! Final analiz yapýlýyor...");
+            Debug.LogWarning("[GeminiManager] KONUÅžMA BÄ°TTÄ°! Final analiz yapÄ±lÄ±yor...");
             if (currentConversationHistory.Count > 0)
             {
+
                 yield return StartCoroutine(AnalyzeEmotions());
+
+                yield return StartCoroutine(ExtractExtremesForSpeaker(hedefKonusmaciEtiketi));
             }
+
+
+            PublishFinal();
+
             onKonusmaBitti?.Invoke();
         }
     }
@@ -179,16 +221,15 @@ public class GeminiManager : MonoBehaviour
             {
                 string speaker = parts[0];
                 string text = parts[1];
-                string role = (speaker.ToLower() == "doktor") ? "user" : "model";
+                string role = (speaker.Equals("Doktor", StringComparison.OrdinalIgnoreCase)) ? "user" : "model";
                 requestBody.Contents.Add(new ContentEntry { Role = role, Parts = new[] { new RequestPart { Text = text } } });
             }
         }
 
-        string finalUserPrompt = $"{systemPrimer}\n\n---\n\nDoktorun YENÝ cümlesi: \"{doktorCumlesi}\"";
+        string finalUserPrompt = $"{systemPrimer}\n\n---\n\nDoktorun YENÄ° cÃ¼mlesi: \"{doktorCumlesi}\"";
         requestBody.Contents.Add(new ContentEntry { Role = "user", Parts = new[] { new RequestPart { Text = finalUserPrompt } } });
 
         string jsonRequestBody = JsonConvert.SerializeObject(requestBody);
-        Debug.Log("Gemini'ye gönderilen yapýlandýrýlmýþ JSON:\n" + jsonRequestBody);
         byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonRequestBody);
 
         using (UnityWebRequest request = new UnityWebRequest(_apiURL, "POST"))
@@ -200,76 +241,119 @@ public class GeminiManager : MonoBehaviour
 
             if (request.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogError($"Gemini API Hatasý: {request.error}\nYanýt: {request.downloadHandler.text}");
-                if (sonucText != null) sonucText.text = $"Bir API hatasý oluþtu: {request.error}";
+                Debug.LogError($"Gemini API HatasÄ±: {request.error}\nYanÄ±t: {request.downloadHandler.text}");
+                if (sonucText != null) sonucText.text = $"Bir API hatasÄ± oluÅŸtu: {request.error}";
                 yield break;
             }
 
             try
             {
                 string hamCikti = request.downloadHandler.text;
-                GeminiApiResponse apiResponse = JsonConvert.DeserializeObject<GeminiApiResponse>(hamCikti);
+                var apiResponse = JsonConvert.DeserializeObject<GeminiApiResponse>(hamCikti);
+
+                if (apiResponse?.Candidates == null || apiResponse.Candidates.Length == 0 ||
+                    apiResponse.Candidates[0]?.Content?.Parts == null || apiResponse.Candidates[0].Content.Parts.Length == 0 ||
+                    string.IsNullOrWhiteSpace(apiResponse.Candidates[0].Content.Parts[0].Text))
+                {
+                    Debug.LogError("Gemini yanÄ±tÄ± beklenen formatta deÄŸil.");
+                    sonucText?.SetText("Modelden geÃ§erli bir Ã§Ä±ktÄ± alÄ±namadÄ±.");
+                    yield break;
+                }
+
                 string modelinUrettigiText = apiResponse.Candidates[0].Content.Parts[0].Text;
-                Match match = Regex.Match(modelinUrettigiText, @"\{.*\}", RegexOptions.Singleline);
+                Match match = Regex.Match(modelinUrettigiText, @"\{[\s\S]*?\}", RegexOptions.Singleline); // lazy
                 string temizlenmisJson = match.Success ? match.Value : modelinUrettigiText;
+
                 GeminiAIResponse sonuc = JsonConvert.DeserializeObject<GeminiAIResponse>(temizlenmisJson);
 
                 if (sonuc != null)
                 {
                     onCocukTepkisiUretildi?.Invoke(sonuc.Tepki);
-                    AddConversation(sonuc.Tepki, "Çocuk");
+                    AddConversation(sonuc.Tepki, "Ã‡ocuk");
                     iknaSonuclari.Add(sonuc.Ikna);
 
                     if (sonucText != null)
                     {
-                        sonucText.text = $"Kategori: {sonuc.Kategori}\nTepki: {sonuc.Tepki}\nAnimasyon: {sonuc.Animasyon}\nDuygu: {sonuc.Duygu}\nÝkna: {sonuc.Ikna}";
-                        onAIResponseAlýndý?.Invoke(new AIResponse { Kategori = sonuc.Kategori, Tepki = sonuc.Tepki, Animasyon = sonuc.Animasyon, Duygu = sonuc.Duygu, Ikna = sonuc.Ikna });
+                        sonucText.text =
+                            $"Kategori: {sonuc.Kategori}\n" +
+                            $"Tepki: {sonuc.Tepki}\n" +
+                            $"Animasyon: {sonuc.Animasyon}\n" +
+                            $"Duygu: {sonuc.Duygu}\n" +
+                            $"Ä°kna: {sonuc.Ikna}";
                     }
+
+                    onAIResponseAlÄ±ndÄ±?.Invoke(new AIResponse
+                    {
+                        Kategori = sonuc.Kategori,
+                        Tepki = sonuc.Tepki,
+                        Animasyon = sonuc.Animasyon,
+                        Duygu = sonuc.Duygu,
+                        Ikna = sonuc.Ikna
+                    });
 
                     if (affectSystem != null)
                     {
                         Deger gelenDeger = Deger.Notr;
-                        switch (sonuc.Kategori.ToLower())
+                        switch ((sonuc.Kategori ?? "").ToLowerInvariant())
                         {
                             case "pozitif": gelenDeger = Deger.Pozitif; break;
                             case "negatif": gelenDeger = Deger.Negatif; break;
                         }
                         affectSystem.CumleKaydet(gelenDeger);
-                        Debug.Log($"<color=cyan>[GeminiManager] AffectSystem'e bildirildi: {gelenDeger}</color>");
                     }
-                    Debug.Log($"Baþarýlý! Kategori: {sonuc.Kategori}, Tepki: {sonuc.Tepki}, Animasyon: {sonuc.Animasyon}, Duygu: {sonuc.Duygu}");
                 }
             }
-            catch (System.Exception e)
+            catch (Exception e)
             {
-                Debug.LogError($"JSON parse hatasý: {e.Message}\nHam Çýktý: {request.downloadHandler.text}");
-                if (sonucText != null) sonucText.text = "Yanýtta geçerli bir format bulunamadý.";
+                Debug.LogError($"JSON parse hatasÄ±: {e.Message}\nHam Ã‡Ä±ktÄ±: {request.downloadHandler.text}");
+                if (sonucText != null) sonucText.text = "YanÄ±tta geÃ§erli bir format bulunamadÄ±.";
             }
         }
     }
 
     private IEnumerator AnalyzeEmotions()
     {
-        string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={geminiApiKey}";
-        var requestBody = new GeminiMultiTurnRequest { Contents = new List<ContentEntry>() };
 
+        var transcriptBuilder = new StringBuilder();
         foreach (var line in currentConversationHistory)
         {
-            string[] parts = line.Split(new[] { ": " }, 2, StringSplitOptions.None);
-            if (parts.Length == 2)
-            {
-                string speaker = parts[0];
-                string text = parts[1];
-                string role = (speaker.ToLower() == "doktor") ? "user" : "model";
-                requestBody.Contents.Add(new ContentEntry { Role = role, Parts = new[] { new RequestPart { Text = text } } });
-            }
+            transcriptBuilder.AppendLine(line);
         }
 
-        requestBody.Contents.Add(new ContentEntry { Role = "user", Parts = new[] { new RequestPart { Text = analysisPrompt } } });
-        string jsonData = JsonConvert.SerializeObject(requestBody);
-        Debug.Log("Duygu Analizi için gönderilen JSON:\n" + jsonData);
+        string fullPrompt = $"{analysisPrompt}\n\n---\n\n{transcriptBuilder.ToString()}";
 
-        using (UnityWebRequest geminiRequest = new UnityWebRequest(apiUrl, "POST"))
+        var requestBody = new GeminiMultiTurnRequest
+        {
+            Contents = new List<ContentEntry>
+        {
+            new ContentEntry
+            {
+                Role = "user",
+                Parts = new[] { new RequestPart { Text = fullPrompt } }
+            }
+        }
+        };
+
+
+        //var requestBody = new GeminiMultiTurnRequest { Contents = new List<ContentEntry>() };
+
+        //foreach (var line in currentConversationHistory)
+        //{
+        //    string[] parts = line.Split(new[] { ": " }, 2, StringSplitOptions.None);
+        //    if (parts.Length == 2)
+        //    {
+        //        string speaker = parts[0];
+        //        string text = parts[1];
+        //        string role = (speaker.Equals("Doktor", StringComparison.OrdinalIgnoreCase)) ? "user" : "model";
+        //        requestBody.Contents.Add(new ContentEntry { Role = role, Parts = new[] { new RequestPart { Text = text } } });
+        //    }
+        //}
+
+        //requestBody.Contents.Add(new ContentEntry { Role = "user", Parts = new[] { new RequestPart { Text = analysisPrompt } } });
+
+        string jsonData = JsonConvert.SerializeObject(requestBody);
+
+        using (UnityWebRequest geminiRequest = new UnityWebRequest(_apiURL, "POST"))
         {
             byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonData);
             geminiRequest.uploadHandler = new UploadHandlerRaw(bodyRaw);
@@ -279,17 +363,28 @@ public class GeminiManager : MonoBehaviour
 
             if (geminiRequest.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogError($"Gemini Duygu Analiz Hatasý: {geminiRequest.error}\nYanýt: {geminiRequest.downloadHandler.text}");
+                Debug.LogError($"Gemini Duygu Analiz HatasÄ±: {geminiRequest.error}\nYanÄ±t: {geminiRequest.downloadHandler.text}");
                 yield break;
             }
 
-            // Deðiþkeni try-catch bloðu dýþýna taþýdýk.
             string responseJson = geminiRequest.downloadHandler.text;
 
             try
             {
                 var apiResponse = JsonConvert.DeserializeObject<GeminiApiResponseObserverFinal>(responseJson);
-                string modelTextOutput = apiResponse.Candidates[0].Content.Parts[0].Text.Trim().Replace("```json", "").Replace("```", "").Trim();
+
+                if (apiResponse?.Candidates == null || apiResponse.Candidates.Length == 0 ||
+                    apiResponse.Candidates[0]?.Content?.Parts == null || apiResponse.Candidates[0].Content.Parts.Length == 0 ||
+                    string.IsNullOrWhiteSpace(apiResponse.Candidates[0].Content.Parts[0].Text))
+                {
+                    Debug.LogError("Duygu analizi yanÄ±tÄ± beklenen formatta deÄŸil.");
+                    yield break;
+                }
+
+                string rawText = apiResponse.Candidates[0].Content.Parts[0].Text;
+                Match match = Regex.Match(rawText, @"\{[\s\S]*\}", RegexOptions.Singleline);
+                string modelTextOutput = match.Success ? match.Value : rawText;
+
                 var emotionResponse = JsonConvert.DeserializeObject<GeminiEmotionResponse>(modelTextOutput);
 
                 AnalysisResult resultData = new AnalysisResult
@@ -299,11 +394,92 @@ public class GeminiManager : MonoBehaviour
                     NegativeScore = emotionResponse.EmotionScores.Negative,
                     feedback = emotionResponse.Summary.feedback,
                 };
-                onAnalizTamamlandý?.Invoke(resultData);
+                _finalFeedback = emotionResponse?.Summary?.feedback ?? "";
+                onAnalizTamamlandÄ±?.Invoke(resultData);
             }
             catch (Exception e)
             {
-                Debug.LogError($"Duygu analizi yanýtý parse edilirken hata oluþtu: {e.Message}\nYanýt: {responseJson}");
+                Debug.LogError($"Duygu analizi yanÄ±tÄ± parse edilirken hata oluÅŸtu: {e.Message}\nYanÄ±t: {responseJson}");
+            }
+        }
+    }
+
+    // Hedef konuÅŸmacÄ± iÃ§in en pozitif/en negatif cÃ¼mleyi Ã§Ä±karÄ±r
+    private IEnumerator ExtractExtremesForSpeaker(string speakerLabel)
+    {
+        var requestBody = new GeminiMultiTurnRequest { Contents = new List<ContentEntry>() };
+
+        foreach (var line in currentConversationHistory)
+        {
+            string[] parts = line.Split(new[] { ": " }, 2, StringSplitOptions.None);
+            if (parts.Length == 2)
+            {
+                string speaker = parts[0];
+                string text = parts[1];
+                string role = (speaker.Equals("Doktor", StringComparison.OrdinalIgnoreCase)) ? "user" : "model";
+                requestBody.Contents.Add(new ContentEntry
+                {
+                    Role = role,
+                    Parts = new[] { new RequestPart { Text = text } }
+                });
+            }
+        }
+
+        string prompt =
+            $"AÅŸaÄŸÄ±daki diyalogda iki konuÅŸmacÄ± var: \"Doktor\" ve \"Ã‡ocuk\".\n" +
+            $"SADECE \"{speakerLabel}\" tarafÄ±ndan sÃ¶ylenen cÃ¼mleleri deÄŸerlendir ve EN POZÄ°TÄ°F ve EN NEGATÄ°F olan TEK cÃ¼mleyi seÃ§.\n" +
+            $"Ã‡IKTIYI SADECE JSON OLARAK ver:\n" +
+            $"{{\"positive\":\"...\",\"negative\":\"...\"}}\n" +
+            $"CÃ¼mleleri orijinal metinden aynen kopyala. JSON dÄ±ÅŸÄ±nda hiÃ§bir ÅŸey yazma.";
+
+        requestBody.Contents.Add(new ContentEntry
+        {
+            Role = "user",
+            Parts = new[] { new RequestPart { Text = prompt } }
+        });
+
+        string jsonData = JsonConvert.SerializeObject(requestBody);
+
+        using (UnityWebRequest req = new UnityWebRequest(_apiURL, "POST"))
+        {
+            byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonData);
+            req.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            req.downloadHandler = new DownloadHandlerBuffer();
+            req.SetRequestHeader("Content-Type", "application/json");
+
+            yield return req.SendWebRequest();
+
+            if (req.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError($"[ExtractExtremesForSpeaker] API HatasÄ±: {req.error}\nYanÄ±t: {req.downloadHandler.text}");
+                yield break;
+            }
+
+            try
+            {
+                var apiResponse = JsonConvert.DeserializeObject<GeminiApiResponse>(req.downloadHandler.text);
+
+                if (apiResponse?.Candidates == null || apiResponse.Candidates.Length == 0 ||
+                    apiResponse.Candidates[0]?.Content?.Parts == null || apiResponse.Candidates[0].Content.Parts.Length == 0 ||
+                    string.IsNullOrWhiteSpace(apiResponse.Candidates[0].Content.Parts[0].Text))
+                {
+                    Debug.LogError("[ExtractExtremesForSpeaker] Beklenen model metni yok.");
+                    yield break;
+                }
+
+                // NEW, CORRECTED CODE
+                string rawText = apiResponse.Candidates[0].Content.Parts[0].Text;
+                Match match = Regex.Match(rawText, @"\{[\s\S]*\}", RegexOptions.Singleline);
+                string raw = match.Success ? match.Value : rawText;
+
+                var extremes = JsonConvert.DeserializeObject<SpeakerExtremes>(raw);
+                _speakerEnPozitif = extremes?.Positive ?? "";
+                _speakerEnNegatif = extremes?.Negative ?? "";
+                Debug.Log($"[ExtractExtremesForSpeaker] {speakerLabel} â†’ Pozitif: {_speakerEnPozitif} | Negatif: {_speakerEnNegatif}");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[ExtractExtremesForSpeaker] Parse HatasÄ±: {e.Message}\nHam: {req.downloadHandler.text}");
             }
         }
     }
@@ -311,17 +487,33 @@ public class GeminiManager : MonoBehaviour
     private void AddConversation(string text, string speakerRole)
     {
         currentConversationHistory.Add($"{speakerRole}: {text}");
-        Debug.Log($"Konuþma geçmiþine eklendi: '{speakerRole}: {text}'");
+        Debug.Log($"KonuÅŸma geÃ§miÅŸine eklendi: '{speakerRole}: {text}'");
     }
+
+    private void PublishFinal()
+    {
+        var paket = new FinalResultData
+        {
+            IknaDurumu = HesaplaIknaDurumu(),
+            ToplamKonusma = konusmaSayaci,
+            EnPozitifCumle = string.IsNullOrWhiteSpace(_speakerEnPozitif) ? "â€”" : _speakerEnPozitif,
+            EnNegatifCumle = string.IsNullOrWhiteSpace(_speakerEnNegatif) ? "â€”" : _speakerEnNegatif,
+            UzunFeedback = string.IsNullOrWhiteSpace(_finalFeedback) ? "Analiz metni Ã¼retilemedi." : _finalFeedback
+        };
+
+        onFinalHazir?.Invoke(paket);
+    }
+
+    private string Normalize(string s) => (s ?? "").Trim().ToLowerInvariant();
 
     private string HesaplaIknaDurumu()
     {
-        int evet = iknaSonuclari.FindAll(x => x == "evet").Count;
-        int hayir = iknaSonuclari.FindAll(x => x == "hayýr").Count;
-        int kararsiz = iknaSonuclari.FindAll(x => x == "kararsýz").Count;
+        int evet = iknaSonuclari.Count(x => Normalize(x) == "evet");
+        int hayir = iknaSonuclari.Count(x => Normalize(x) == "hayÄ±r" || Normalize(x) == "hayir");
+        int kararsiz = iknaSonuclari.Count(x => Normalize(x) == "kararsÄ±z" || Normalize(x) == "kararsiz");
 
         if (evet > hayir && evet > kararsiz) return "ikna oldu (evet)";
-        if (hayir > evet && hayir > kararsiz) return "ikna olmadý (hayýr)";
-        return "kararsýz";
+        if (hayir > evet && hayir > kararsiz) return "ikna olmadÄ± (hayÄ±r)";
+        return "kararsÄ±z";
     }
 }

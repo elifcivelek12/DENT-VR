@@ -1,0 +1,77 @@
+{
+    "version": 1,
+    "name": "AvatarControls",
+    "maps": [
+        {
+            "name": "Avatar",
+            "id": "b03fa490-7f21-41aa-af76-08a619d4a4f5",
+            "actions": [
+                {
+                    "name": "Walk",
+                    "type": "Button",
+                    "id": "376c2ca0-d3ee-4b10-8254-c100d8aafb60",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "SitToggle",
+                    "type": "Button",
+                    "id": "bb36c957-08a5-48f4-a024-9399c4bbd3d6",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "cf9fe140-4472-4e96-9e4b-3de7984e017e",
+                    "path": "<Keyboard>/m",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Walk",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "f6ba8770-382f-4514-965e-120fe246eb93",
+                    "path": "<XRController>{LeftHand}/{SecondaryButton}",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Walk",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "84fbd780-fa14-41f3-8107-811a3daba2fa",
+                    "path": "<Keyboard>/n",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "SitToggle",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "c25ee133-54f5-4e1f-9695-c0307ef5c490",
+                    "path": "<XRController>{LeftHand}/{PrimaryButton}",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "SitToggle",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        }
+    ],
+    "controlSchemes": []
+}
