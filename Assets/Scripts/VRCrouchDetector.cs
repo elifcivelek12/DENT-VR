@@ -14,7 +14,7 @@ public class VRCrouchDetector : MonoBehaviour
 
     [Header("Input Actions")]
     [Tooltip("Yeniden kalibrasyon yapmak için kullanılacak Input Action.")]
-    public InputActionReference recalibrateAction; // 'R' tuşu yerine bu referansı kullanacağız
+    public InputActionReference recalibrateAction; 
 
     // STATIC EVENTS
     public static event Action OnCrouchStartStatic;

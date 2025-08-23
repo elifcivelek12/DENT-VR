@@ -1555,6 +1555,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "HeadRefoctor",
+                    "type": "Button",
+                    "id": "e6f9b1cd-8cf7-4454-91a5-3d9fe9058b4e",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -1978,12 +1987,34 @@
                 },
                 {
                     "name": "",
-                    "id": "06c756b5-dffb-4654-8c29-d6081a9c4448",
-                    "path": "<Keyboard>/#(G)",
+                    "id": "2b6f8685-a4d5-43cc-ac64-6d0b5ab53b0b",
+                    "path": "<Keyboard>/#(Ç)",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
                     "action": "VoiceRecording",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "31a15ffc-e42a-4b0a-a922-61abccb80aca",
+                    "path": "<XRController>{RightHand}/{Primary2DAxisClick}",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "HeadRefoctor",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "eb945901-c31b-4f84-8b73-6ef40f2589f8",
+                    "path": "<Keyboard>/#(H)",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "HeadRefoctor",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
@@ -2530,6 +2561,17 @@
                     "name": "",
                     "id": "7ecb549e-ab98-4a4b-b979-38068fe3b811",
                     "path": "<XRController>{RightHand}/{GripButton}",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Grab Move",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "743de638-bf50-4249-87c3-10641717c605",
+                    "path": "<Keyboard>/g",
                     "interactions": "",
                     "processors": "",
                     "groups": "",

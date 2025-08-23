@@ -1,24 +1,10 @@
+GÖREVİN:  
+
 Lütfen aşağıdaki konuşma geçmişini analiz et. Hem doktorun hem de çocuğun cümlelerine odaklan. 
 *Sadece doktorun* genel yaklaşımının pozitif, negatif ve nötr duygu skorlarını yüzde olarak belirle.
 
 Tüm konuşma boyunca sohbetin ilerleyişini, doktorun kullandığı kelimelerin çocuk ile iletişime uygunluğunu iki cümlede yorumla, string olarak gönder.
 
-Cevabını SADECE aşağıdaki JSON formatında ver. Başka metin ekleme:
-
-{
-  "emotionScores": {
-    "positive": <pozitif yüzde>,
-    "neutral": <nötr yüzde>,
-    "negative": <negatif yüzde>
-  },
-  "summary": {
-    "feedback": <sohbetin geneli hakkında geribildirim, 10 üzerinden başarı puanı>
-  }
-}
-
----
-
-GÖREVİN:  
 VR pediatrik diş hekimliği simülasyonunda öğrencinin yaklaşımını aşağıdaki 4 kritere göre değerlendir.  
 Her kriter 0–25 puan aralığında değerlendirilecek, toplam puan 100 üzerinden hesaplanacaktır.  
 60 ve üzeri puan **geçer**, 59 ve altı **başarısız** sayılır.
@@ -47,29 +33,29 @@ Her kriter 0–25 puan aralığında değerlendirilecek, toplam puan 100 üzerin
 - Yanlış, abartılı veya efsanevi ifadelerden kaçınılmalı.  
 - Dürüstlük korunmalı: işlem küçültülmeden ama güvenli bir dille aktarılmalı.  
 
----
 
-ÇIKTI (JSON formatında):  
+Cevabını SADECE aşağıdaki JSON formatında ver. Başka metin ekleme:
 
 {
+  "emotionScores": {
+    "positive": <pozitif yüzde>,
+    "neutral": <nötr yüzde>,
+    "negative": <negatif yüzde>
+  },
+  "summary": {
+    "feedback": <sohbetin geneli hakkında geribildirim, 10 üzerinden başarı puanı>
+  },
+  "detaylidegerlendirme" :{
   "toplam_puan": 0,
   "kategoriler": {
     "basit_dil": 0,
     "negatiften_kacinma": 0,
     "ses_yuksekligi_denge": 0,
     "dogru_bilgi": 0
-  },
-  "geri_bildirim": {
-    "guc": ["..."],
-    "gelistirme": ["..."],
-    "ornek_ifade_onerileri": ["..."]
-  },
-  "karar": "gecer|basarisiz",
-  "notlar": "..."
+    "karar": "gecer|basarisiz",
+    "notlar": "..."
+    }
+  }
 }
 
 ---
-
-[TRANSKRIPT_BASLA]
-BURAYA KONUŞMA METNİNİ YAPIŞTIR
-[TRANSKRIPT_BITIR]

@@ -1,43 +1,43 @@
-using UnityEngine;
+//using UnityEngine;
 
-public class RagdollController : MonoBehaviour
-{
-    private Rigidbody[] ragdollRigidbodies;
-    private Collider[] ragdollColliders;
-    private Animator animator;
+//public class RagdollController : MonoBehaviour
+//{
+//    private Rigidbody[] ragdollRigidbodies;
+//    private Collider[] ragdollColliders;
+//    private Animator animator;
 
-    void Start()
-    {
-        ragdollRigidbodies = GetComponentsInChildren<Rigidbody>();
-        ragdollColliders = GetComponentsInChildren<Collider>();
-        animator = GetComponent<Animator>();
+//    void Start()
+//    {
+//        ragdollRigidbodies = GetComponentsInChildren<Rigidbody>();
+//        ragdollColliders = GetComponentsInChildren<Collider>();
+//        animator = GetComponent<Animator>();
 
-        DeactivateRagdoll();
-    }
+//        DeactivateRagdoll();
+//    }
 
-    public void ActivateRagdoll()
-    {
-        animator.enabled = false;
-        foreach (Rigidbody rb in ragdollRigidbodies)
-        {
-            rb.isKinematic = false;
-        }
-    }
+//    public void ActivateRagdoll()
+//    {
+//        animator.enabled = false;
+//        foreach (Rigidbody rb in ragdollRigidbodies)
+//        {
+//            rb.isKinematic = false;
+//        }
+//    }
 
-    public void DeactivateRagdoll()
-    {
-        foreach (Rigidbody rb in ragdollRigidbodies)
-        {
-            rb.isKinematic = true;
-        }
-        animator.enabled = true;
-    }
+//    public void DeactivateRagdoll()
+//    {
+//        foreach (Rigidbody rb in ragdollRigidbodies)
+//        {
+//            rb.isKinematic = true;
+//        }
+//        animator.enabled = true;
+//    }
 
-    void OnCollisionEnter(Collision collision)
-    {
-        if (collision.gameObject.CompareTag("PlayerHand")) // Make sure your VR hands have this tag
-        {
-            ActivateRagdoll();
-        }
-    }
-}
+//    void OnCollisionEnter(Collision collision)
+//    {
+//        if (collision.gameObject.CompareTag("PlayerHand")) 
+//        {
+//            ActivateRagdoll();
+//        }
+//    }
+//}
