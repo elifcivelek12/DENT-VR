@@ -11,13 +11,7 @@
 /[Rr]eports/
 /[Uu]ser[Ss]ettings/
 
-# MemoryCaptures can be safely ignored, but you can commit themMemoryCaptures can be safely ignored, but you can commit them
-# if you want to share performance stats across team members.
-#/[Mm]emoryCaptures/
-
-# Asset meta files should only be ignored when the asset is not committed (e.g. Generated assets).
-# Uncomment this line if you want to ignore all .meta files.
-#*.meta
+*.meta
 
 # Visual Studio / Rider object files
 *.csproj
@@ -51,3 +45,7 @@ sysinfo.txt
 
 # Crashlytics generated folder
 crashlytics-build.properties
+
+# Firebase C++ kütüphaneleri
+Assets/Firebase/Plugins/x86_64/*.bundle
+Assets/Firebase/Plugins/x86_64/*.so
